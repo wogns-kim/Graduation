@@ -5,7 +5,7 @@ import styled from "@emotion/styled";
 
 // 컴포넌트 및 데이터 불러오기
 import Header from '../../components/Header';
-import CityCard from '../../components/Header/CityCard';
+import CityCard from '../../components/CityCard';
 import { cityData } from '../../data/cityData';
 
 // --- 페이지 레이아웃을 위한 스타일 컴포넌트 ---

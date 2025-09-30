@@ -3,10 +3,11 @@
 import '@emotion/react';
 import { theme } from './styles/theme';
 
-// typeof를 사용해 theme 객체의 타입을 추론합니다.
+// theme 객체의 타입을 그대로 가져와 ThemeType으로 정의합니다.
 type ThemeType = typeof theme;
 
-// Emotion의 기본 Theme 타입을 우리가 만든 ThemeType으로 확장합니다.
+// Emotion의 기본 Theme 인터페이스를 우리가 만든 ThemeType으로 확장(extend)합니다.
+// 이렇게 하면 Emotion의 모든 styled-component 안에서 우리 theme의 타입을 알 수 있게 됩니다.
 declare module '@emotion/react' {
     export interface Theme extends ThemeType { }
 }
