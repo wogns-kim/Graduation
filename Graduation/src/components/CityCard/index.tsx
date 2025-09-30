@@ -1,5 +1,5 @@
 // src/components/CityCard/index.tsx
-
+//new
 import styled from "@emotion/styled";
 
 // --- 스타일 컴포넌트 ---
