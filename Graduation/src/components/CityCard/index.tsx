@@ -19,9 +19,10 @@ const CardContainer = styled.div`
   }
 `;
 
+// height auto로 수정
 const CardImage = styled.img`
   width: 100%;
-  height: 200px;
+  height: auto;
   object-fit: cover; // 이미지가 비율에 맞게 채워지도록
 `;
 
