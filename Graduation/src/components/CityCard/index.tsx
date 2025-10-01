@@ -19,11 +19,13 @@ const CardContainer = styled.div`
   }
 `;
 
-// height auto로 수정
+// 이미지 크기 수정 및 위치 수정
 const CardImage = styled.img`
-  width: 100%;
-  height: auto;
+  width: 150px;
+  height: 150px;
   object-fit: cover; // 이미지가 비율에 맞게 채워지도록
+  margin: auto;
+  margin-top: 20px;
 `;
 
 const CardBody = styled.div`
