@@ -3,6 +3,7 @@ import { ThemeProvider } from '@emotion/react';
 import { theme } from './styles/theme';
 import GlobalStyles from './styles/GlobalStyles';
 import HomePage from './pages/HomePage';
+//import MyPage from './pages/MyPage';
 
 function App() {
     return (

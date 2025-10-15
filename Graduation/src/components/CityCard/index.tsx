@@ -1,5 +1,6 @@
 // src/components/CityCard/index.tsx
 //new
+//new2
 import styled from "@emotion/styled";
 
 // --- 스타일 컴포넌트 ---
@@ -12,6 +13,8 @@ const CardContainer = styled.div`
   transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
+    height: 100%; // 그리드 높이에 맞춤
+
 
   &:hover {
     transform: translateY(-5px);
@@ -19,18 +22,18 @@ const CardContainer = styled.div`
   }
 `;
 
-// 이미지 크기 수정 및 위치 수정
 const CardImage = styled.img`
-  width: 150px;
-  height: 150px;
-  object-fit: cover; // 이미지가 비율에 맞게 채워지도록
-  margin: auto;
-  margin-top: 20px;
+  width: 100%;
+  height: 280px; // 고정 높이로 변경
+  object-fit: cover;
+  flex-shrink: 0; // 이미지가 줄어들지 않도록
 `;
 
 const CardBody = styled.div`
-  padding: 1.5rem;
-  flex-grow: 1;
+  padding: 1.25rem; // 2.0rem에서 1.25rem으로 줄임
+  flex: 1; // 남은 공간 채우기
+  display: flex;
+  flex-direction: column;
 `;
 
 const CardTitle = styled.h3`
