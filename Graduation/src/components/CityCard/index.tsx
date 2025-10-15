@@ -24,14 +24,9 @@ const CardContainer = styled.div`
 
 const CardImage = styled.img`
   width: 100%;
-<<<<<<< Updated upstream
-  height: 200px;
-  object-fit: cover; // 이미지가 비율에 맞게 채워지도록
-=======
   height: 280px; // 고정 높이로 변경
   object-fit: cover;
   flex-shrink: 0; // 이미지가 줄어들지 않도록
->>>>>>> Stashed changes
 `;
 
 const CardBody = styled.div`
