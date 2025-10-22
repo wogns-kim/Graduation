@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import styled from "@emotion/styled";
+import { useNavigate } from 'react-router-dom';
 
 interface TravelLog {
   id: number;
@@ -59,6 +60,13 @@ const TravelCard = styled.div`
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   border: 1px solid #e9e9e9;
+  cursor: pointer; /* 클릭 가능함을 나타내는 커서 */
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+  }
 `;
 
 const CardImage = styled.img`
@@ -85,6 +93,14 @@ const CardPrice = styled.p`
 const UserTabs: React.FC<UserTabsProps> = ({ travelLogs }) => {
   // 'log' (여행 기록) 또는 'notification' (알림) 상태를 관리
   const [activeTab, setActiveTab] = useState('log');
+  const navigate = useNavigate();
+
+  const handleCardClick = (logId: number) => {
+    // '/travel-route' 경로로 이동합니다.
+    // 나중에 logId를 이용해 특정 여행 경로 데이터를 불러오도록 확장할 수 있습니다. (예: navigate(`/travel-route/${logId}`))
+    console.log(`Navigating to travel route for log ID: ${logId}`); // 콘솔 로그 추가 (확인용)
+    navigate('/travel-route'); 
+  };
 
   return (
     <TabsContainer>
@@ -108,7 +124,7 @@ const UserTabs: React.FC<UserTabsProps> = ({ travelLogs }) => {
           // "여행 기록" 탭이 활성화된 경우
           <CardGrid>
             {travelLogs.map((log) => (
-              <TravelCard key={log.id}>
+              <TravelCard key={log.id} onClick={() => handleCardClick(log.id)}>
                 <CardImage src={log.imageUrl} alt={log.title} />
                 <CardInfo>
                   <CardTitle>{log.title}</CardTitle>
