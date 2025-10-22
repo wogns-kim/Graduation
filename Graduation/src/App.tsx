@@ -6,6 +6,7 @@ import GlobalStyles from './styles/GlobalStyles';
 import HomePage from './pages/HomePage';
 import MyPage from './pages/MyPage';
 import  TravelRoutePage  from "./components/MyPage/mypage";
+import  Taste  from "./components/Select your taste/select_your_taste";
 
 function App() {
     return (
@@ -19,6 +20,7 @@ function App() {
                     <Route path="/mypage" element={<MyPage />} />
 
                     <Route path="/travel-route" element={<TravelRoutePage />} />
+                    <Route path="/taste" element={<Taste />} />
                     {/* 여기에 다른 페이지 경로들을 계속 추가할 수 있습니다. */}
                 </Routes>
             </BrowserRouter>
