@@ -22,69 +22,69 @@ export default function TravelRoutePage() {
         <div style={styles.rootWrapper}>
             <style>{`
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
         }
         
         .route-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
-          border-color: #667eea;
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+        border-color: #667eea;
         }
         
         .rec-card:hover {
-          transform: translateX(5px);
-          box-shadow: 0 5px 15px rgba(102, 126, 234, 0.15);
-          border-color: #667eea;
+        transform: translateX(5px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.15);
+        border-color: #667eea;
         }
         
         .edit-btn:hover {
-          background: #667eea;
-          color: white;
-          transform: scale(1.05);
+        background: #667eea;
+        color: white;
+        transform: scale(1.05);
         }
         
         .add-btn:hover {
-          transform: scale(1.05);
-          box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
         
         .close-btn:hover {
-          background: #fee;
-          color: #f56565;
+        background: #fee;
+        color: #f56565;
         }
         
         .next-btn:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
         }
         
         .next-btn:hover svg {
-          transform: translateX(5px);
+        transform: translateX(5px);
         }
         
         .rec-scroll::-webkit-scrollbar {
-          width: 8px;
+        width: 8px;
         }
         
         .rec-scroll::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 10px;
+        background: #f1f1f1;
+        border-radius: 10px;
         }
         
         .rec-scroll::-webkit-scrollbar-thumb {
-          background: #667eea;
-          border-radius: 10px;
+        background: #667eea;
+        border-radius: 10px;
         }
 
         @media (max-width: 1200px) {
-          .three-column-grid {
+        .three-column-grid {
             grid-template-columns: 1fr !important;
-          }
         }
-      `}</style>
+        }
+    `}</style>
 
             <div style={styles.container}>
                 {/* 3단 레이아웃 */}
@@ -208,7 +208,7 @@ const styles = {
     },
     leftColumn: {
         display: 'flex',
-        flexDirection: 'column' as 'column',
+        flexDirection: 'column',
         gap: '20px',
     },
     tripDetailsCard: {
@@ -239,7 +239,7 @@ const styles = {
     tripImage: {
         width: '100%',
         height: '300px',
-        objectFit: 'cover' as 'cover',
+        objectFit: 'cover',
         borderRadius: '15px',
         boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
     },
@@ -251,7 +251,7 @@ const styles = {
     },
     avatarGroup: {
         display: 'flex',
-        flexDirection: 'column' as 'column',
+        flexDirection: 'column',
         gap: '15px',
     },
     avatarItem: {
@@ -299,7 +299,7 @@ const styles = {
     },
     routeCards: {
         display: 'flex',
-        flexDirection: 'column' as 'column',
+        flexDirection: 'column',
         gap: '20px',
     },
     routeCard: {
@@ -354,10 +354,10 @@ const styles = {
     },
     recommendationCards: {
         display: 'flex',
-        flexDirection: 'column' as 'column',
+        flexDirection: 'column',
         gap: '15px',
         maxHeight: '700px',
-        overflowY: 'auto' as 'auto',
+        overflowY: 'auto',
         paddingRight: '10px',
     },
     recommendationCard: {
@@ -438,4 +438,4 @@ const styles = {
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
         transition: 'all 0.3s ease',
     },
-};
+} as const;
