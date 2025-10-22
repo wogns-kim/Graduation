@@ -50,8 +50,8 @@ const LogoutButton = styled.button`
 `;
 
 const soloTravelLogs = [
-  { id: 1, title: '부산 여행', price: 0, imageUrl: '/mainpage_images/mainpage_Busan.png' },
-  { id: 2, title: '서울 탐방', price: 0, imageUrl: '/mainpage_images/mainpage_Seoul.png' },
+  { id: 1, title: '서울 탐방', price: 0, imageUrl: '/mainpage_images/mainpage_Seoul.png' },
+  { id: 2, title: '부산 여행', price: 0, imageUrl: '/mainpage_images/mainpage_Busan.png' },
   { id: 3, title: '제주도 일주', price: 0, imageUrl: '/mainpage_images/mainpage_Jeju.png' },
 ];
 const friendTravelLogs = [
