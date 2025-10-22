@@ -126,7 +126,7 @@ const SearchBar = styled.div`
   }
 
   /* --- 나머지 커스텀 스타일 --- */
-  .react-datepicker__day--weekend:first-child {
+  .react-datepicker__day--weekend:first-of-type {
     color: red !important;
   }
 

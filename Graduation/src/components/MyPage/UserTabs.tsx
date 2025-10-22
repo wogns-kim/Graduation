@@ -118,7 +118,7 @@ const UserTabs: React.FC<UserTabsProps> = ({ travelLogs }) => {
             ))}
           </CardGrid>
         ) : (
-          // "알림" 탭이 활성화된 경우
+          // "취향" 탭이 활성화된 경우
           <div>
             <p>선택한 취향이 없습니다.</p>
           </div>

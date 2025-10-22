@@ -11,6 +11,8 @@ interface User {
 
 interface UserProfileProps {
   user: User;
+  selectedValue: string;
+  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 }
 
 const ProfileContainer = styled.div`
@@ -107,7 +109,7 @@ const Dropdown = styled.select`
   }
 `;
 
-const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ user, selectedValue, onChange }) => {
   return (
     <ProfileContainer>
       <ProfileImage src={user.profileImage} alt={`${user.name}의 프로필 사진`} />
@@ -119,7 +121,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
         <Tag>자기소개</Tag>
         <Stat>{user.ageGroup}</Stat>
         <Introduction>{user.introduction}</Introduction>
-        <Dropdown defaultValue={user.travelPreference}>
+        <Dropdown value={selectedValue} onChange={onChange}>
           <option value="혼자 여행">혼자 여행</option>
           <option value="친구와 여행">친구와 여행</option>
           <option value="연인과 여행">연인과 여행</option>
