@@ -63,11 +63,15 @@ const NavButton = styled.button<{ primary?: boolean }>`
 // --- Header 컴포넌트 ---
 
 function Header() {
+    const KAKAO_LOGIN_URL = "http://127.0.0.1:8000/api/users/kakao/login";
+
     return (
         <HeaderContainer>
             <Logo>First Trip</Logo>
             <Nav>
-                <NavButton>로그인</NavButton>
+                <a href={KAKAO_LOGIN_URL}>
+                    <NavButton>로그인</NavButton>
+                </a>
                 <NavButton primary>회원 가입</NavButton>
             </Nav>
         </HeaderContainer>
