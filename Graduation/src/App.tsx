@@ -19,7 +19,7 @@ function App() {
                     <Route path="/" element={<HomePage />} />
                     <Route path="/mypage" element={<MyPage />} />
 
-                    <Route path="/travel-route" element={<TravelRoutePage />} />
+                    <Route path="/travel-route/:cityId" element={<TravelRoutePage />} />
                     <Route path="/taste" element={<Taste />} />
                     {/* 여기에 다른 페이지 경로들을 계속 추가할 수 있습니다. */}
                 </Routes>

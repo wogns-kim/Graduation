@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import styled from "@emotion/styled";
+import { Link } from "react-router-dom"; // <-- 1. react-router-dom의 Link를 가져옵니다.
 
 // 달력 UI 변경
 import DatePicker, { registerLocale } from "react-datepicker";
@@ -12,8 +13,8 @@ import "react-datepicker/dist/react-datepicker.css";
 registerLocale('ko', ko);
 
 // 컴포넌트 및 데이터 불러오기
-import Header from "../../components/Header";
-import CityCard from "../../components/CityCard";
+import Header from "../../components/Header/Header;";
+import CityCard from "../../components/CityCard/CityCard";
 import { cityData } from "../../data/cityData";
 
 // --- 페이지 레이아웃을 위한 스타일 컴포넌트 ---
@@ -25,6 +26,7 @@ const PageWrapper = styled.div`
 
 const MainContent = styled.main``;
 
+// ... (HeroSection, SearchBar 등 다른 스타일 컴포넌트는 그대로)
 const HeroSection = styled.section`
   background: linear-gradient(to right, #6a82fb, #fc5c7d);
   display: flex;
@@ -47,7 +49,8 @@ const SearchBar = styled.div`
     flex-direction: column;
     align-items: stretch;
   }
-
+  
+  /* ... (내부 DatePicker 스타일은 그대로) ... */
   .react-datepicker-wrapper {
     flex: 1;
     mid-width: 180px;
@@ -197,6 +200,14 @@ const CardGrid = styled.div`
   gap: 2rem;
 `;
 
+// <-- 2. <Link>의 기본 스타일(밑줄, 파란색)을 없애는 새 스타일 컴포넌트
+const StyledLink = styled(Link)`
+  text-decoration: none; /* 밑줄 제거 */
+  color: inherit; /* 글자색을 부모 요소에서 상속 */
+  display: block; /* 카드 영역 전체를 링크로 만듦 */
+`;
+
+
 // --- 홈페이지 컴포넌트 ---
 
 export default function HomePage() {
@@ -206,22 +217,23 @@ export default function HomePage() {
   const [endDate, setEndDate] = useState<Date | null>(null);
 
   const handleSearch = () => {
-        let dateInfo = "전체";
-        if (startDate && endDate) {
-            // 시작일과 종료일이 모두 선택된 경우
-            dateInfo = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
-        } else if (startDate) {
-            // 시작일만 선택된 경우
-            dateInfo = `${startDate.toLocaleDateString()} -`;
-        }
-        
-        alert(`검색 정보:\n여행지: ${destination || '전체'}\n인원: ${numPeople || '전체'}\n날짜: ${dateInfo}`);
-    };
+    let dateInfo = "전체";
+    if (startDate && endDate) {
+      // 시작일과 종료일이 모두 선택된 경우
+      dateInfo = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+    } else if (startDate) {
+      // 시작일만 선택된 경우
+      dateInfo = `${startDate.toLocaleDateString()} -`;
+    }
+
+    alert(`검색 정보:\n여행지: ${destination || '전체'}\n인원: ${numPeople || '전체'}\n날짜: ${dateInfo}`);
+  };
 
   return (
     <PageWrapper>
       <Header />
       <MainContent>
+        {/* ... (HeroSection, SearchBar 등은 그대로) ... */}
         <HeroSection>
           <SearchBar>
             <SearchInput
@@ -257,16 +269,21 @@ export default function HomePage() {
           </SearchBar>
         </HeroSection>
 
+
         <CardGridSection>
           <h2>어디로 떠나볼까요?</h2>
           <CardGrid>
+            {/* <-- 3. .map() 내부를 <StyledLink>로 감싸줍니다. */}
             {cityData.map((city) => (
-              <CityCard
-                key={city.id}
-                name={city.name}
-                description={city.description}
-                imageUrl={city.imageUrl}
-              />
+              // map() 안의 최상위 요소에 key를 줘야 합니다.
+              <StyledLink key={city.id} to={`/travel-route/${city.id}`}>
+                <CityCard
+                  // key는 StyledLink로 이동
+                  name={city.name}
+                  description={city.description}
+                  imageUrl={city.imageUrl}
+                />
+              </StyledLink>
             ))}
           </CardGrid>
         </CardGridSection>
