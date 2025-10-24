@@ -1,6 +1,10 @@
-// src/components/Header/index.tsx
-
 import styled from "@emotion/styled";
+import { Link } from "react-router-dom";
+
+// --- 카카오 로그인 설정 ---
+const KAKAO_REST_API_KEY = "여기에_본인의_카카오_REST_API_키를_입력하세요";
+const REDIRECT_URI = "http://localhost:5173/auth/kakao/callback";
+const KAKAO_AUTH_URL = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`;
 
 // --- 스타일 컴포넌트 ---
 
@@ -12,7 +16,7 @@ const HeaderContainer = styled.header`
   height: 80px;
   background: ${({ theme }) => theme.colors.white};
   border-bottom: 1px solid #eee;
-  
+
   @media (max-width: 768px) {
     padding: 0 20px;
   }
@@ -29,6 +33,11 @@ const Logo = styled.h1`
   }
 `;
 
+const StyledLink = styled(Link)`
+  text-decoration: none;
+  color: inherit;
+`;
+
 const Nav = styled.nav`
   display: flex;
   gap: 1rem;
@@ -38,7 +47,8 @@ const Nav = styled.nav`
   }
 `;
 
-const NavButton = styled.button<{ primary?: boolean }>`
+// ✅ 핵심 변경: styled('span')으로 수정해서 as="a" 시 타입 인식되게 함
+const NavButton = styled('a') <{ primary?: boolean }>`
   padding: 8px 16px;
   border-radius: 20px;
   border: 1px solid ${({ theme, primary }) => (primary ? 'transparent' : theme.colors.border)};
@@ -48,6 +58,8 @@ const NavButton = styled.button<{ primary?: boolean }>`
   background-color: ${({ theme, primary }) => (primary ? theme.colors.primary : theme.colors.white)};
   color: ${({ theme, primary }) => (primary ? theme.colors.white : theme.colors.text)};
   transition: all 0.2s ease-in-out;
+  text-decoration: none;
+  display: inline-block;
 
   &:hover {
     transform: translateY(-2px);
@@ -60,18 +72,33 @@ const NavButton = styled.button<{ primary?: boolean }>`
   }
 `;
 
-// --- Header 컴포넌트 ---
 
+// --- Header 컴포넌트 ---
 function Header() {
-    return (
-        <HeaderContainer>
-            <Logo>First Trip</Logo>
-            <Nav>
-                <NavButton>로그인</NavButton>
-                <NavButton primary>회원 가입</NavButton>
-            </Nav>
-        </HeaderContainer>
-    );
+  return (
+    <HeaderContainer>
+      {/* 로고 클릭 시 홈('/')으로 이동 */}
+      <StyledLink to="/">
+        <Logo>First Trip</Logo>
+      </StyledLink>
+
+      <Nav>
+        {/* 로그인 페이지 이동 */}
+        <StyledLink to="/login">
+          <NavButton>로그인</NavButton>
+        </StyledLink>
+
+        {/* 카카오 회원가입 */}
+        <NavButton
+          primary
+          as="a"
+          href={KAKAO_AUTH_URL}
+        >
+          회원 가입
+        </NavButton>
+      </Nav>
+    </HeaderContainer>
+  );
 }
 
 export default Header;
