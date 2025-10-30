@@ -2,8 +2,8 @@ import styled from "@emotion/styled";
 import { Link } from "react-router-dom";
 
 // --- 카카오 로그인 설정 ---
-const KAKAO_REST_API_KEY = "여기에_본인의_카카오_REST_API_키를_입력하세요";
-const REDIRECT_URI = "http://localhost:5173/auth/kakao/callback";
+const KAKAO_REST_API_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY;
+const REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI; // 로컬용
 const KAKAO_AUTH_URL = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`;
 
 // --- 스타일 컴포넌트 ---
@@ -47,7 +47,7 @@ const Nav = styled.nav`
   }
 `;
 
-// ✅ 핵심 변경: styled('span')으로 수정해서 as="a" 시 타입 인식되게 함
+// (스타일 컴포넌트 정의는 동일합니다)
 const NavButton = styled('a') <{ primary?: boolean }>`
   padding: 8px 16px;
   border-radius: 20px;
@@ -75,6 +75,12 @@ const NavButton = styled('a') <{ primary?: boolean }>`
 
 // --- Header 컴포넌트 ---
 function Header() {
+
+  // ✅ 1. 팝업창을 띄우는 함수를 정의합니다.
+  const handleKakaoLogin = () => {
+    window.open(KAKAO_AUTH_URL, "kakaoLogin", "width=500,height=600");
+  };
+
   return (
     <HeaderContainer>
       {/* 로고 클릭 시 홈('/')으로 이동 */}
@@ -88,11 +94,11 @@ function Header() {
           <NavButton>로그인</NavButton>
         </StyledLink>
 
-        {/* 카카오 회원가입 */}
+        {/* ✅ 2. 카카오 회원가입: 'as', 'href'를 'onClick'으로 변경 */}
         <NavButton
           primary
-          as="a"
-          href={KAKAO_AUTH_URL}
+          as="button" // 렌더링 시 <a> 대신 <button> 태그로 렌더링
+          onClick={handleKakaoLogin} // 클릭 시 팝업 함수 실행
         >
           회원 가입
         </NavButton>

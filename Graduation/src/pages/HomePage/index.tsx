@@ -13,7 +13,7 @@ import "react-datepicker/dist/react-datepicker.css";
 registerLocale('ko', ko);
 
 // 컴포넌트 및 데이터 불러오기
-import Header from "../../components/Header/Header;";
+
 import CityCard from "../../components/CityCard/CityCard";
 import { cityData } from "../../data/cityData";
 
@@ -231,7 +231,7 @@ export default function HomePage() {
 
   return (
     <PageWrapper>
-      <Header />
+      
       <MainContent>
         {/* ... (HeroSection, SearchBar 등은 그대로) ... */}
         <HeroSection>
