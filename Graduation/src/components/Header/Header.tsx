@@ -1,6 +1,5 @@
 import styled from "@emotion/styled";
 import { Link } from "react-router-dom";
-
 // --- 카카오 로그인 설정 ---
 const KAKAO_REST_API_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY;
 const REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI; // 로컬용
@@ -48,27 +47,26 @@ const Nav = styled.nav`
 `;
 
 // (스타일 컴포넌트 정의는 동일합니다)
-const NavButton = styled('a') <{ primary?: boolean }>`
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: 1px solid ${({ theme, primary }) => (primary ? 'transparent' : theme.colors.border)};
+const KakaoLoginButton = styled.button`
+  padding: 0;
+  border: none;
+  background: none;
   cursor: pointer;
-  font-size: 15px;
-  font-weight: 600;
-  background-color: ${({ theme, primary }) => (primary ? theme.colors.primary : theme.colors.white)};
-  color: ${({ theme, primary }) => (primary ? theme.colors.white : theme.colors.text)};
-  transition: all 0.2s ease-in-out;
-  text-decoration: none;
-  display: inline-block;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  
+  img {
+    display: block; // 이미지 기본 여백 제거
+    width: 183px; // 카카오 가이드에 맞는 기본 크기 (medium-wide)
+    
+    &:hover {
+      opacity: 0.9; // 간단한 호버 효과
+    }
   }
 
+  // 모바일에서는 이미지를 조금 줄일 수 있습니다.
   @media (max-width: 768px) {
-    font-size: 13px;
-    padding: 6px 12px;
+    img {
+      width: 150px;
+    }
   }
 `;
 
@@ -89,19 +87,16 @@ function Header() {
       </StyledLink>
 
       <Nav>
-        {/* 로그인 페이지 이동 */}
-        <StyledLink to="/login">
-          <NavButton>로그인</NavButton>
-        </StyledLink>
-
-        {/* ✅ 2. 카카오 회원가입: 'as', 'href'를 'onClick'으로 변경 */}
-        <NavButton
-          primary
-          as="button" // 렌더링 시 <a> 대신 <button> 태그로 렌더링
-          onClick={handleKakaoLogin} // 클릭 시 팝업 함수 실행
-        >
-          회원 가입
-        </NavButton>
+        {/* ✅ 2. NavButton 대신 KakaoLoginButton을 사용합니다. */}
+        <KakaoLoginButton onClick={handleKakaoLogin}>
+          {/* ✅ 3. public 폴더 안의 경로를 절대 경로로 적어줍니다.
+            /kakapo_login/kakao_login_large_narrow.png
+          */}
+          <img
+            src="/kakao_login/kakao_login_large_narrow.png"
+            alt="카카오로 로그인"
+          />
+        </KakaoLoginButton>
       </Nav>
     </HeaderContainer>
   );
