@@ -1,5 +1,8 @@
 import styled from "@emotion/styled";
 import { Link } from "react-router-dom";
+
+console.log("VITE_KAKAO_REST_API_KEY:", import.meta.env.VITE_KAKAO_REST_API_KEY);
+console.log("VITE_KAKAO_REDIRECT_URI:", import.meta.env.VITE_KAKAO_REDIRECT_URI);
 // --- 카카오 로그인 설정 ---
 const KAKAO_REST_API_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY;
 const REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI; // 로컬용
