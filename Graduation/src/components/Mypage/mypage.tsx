@@ -178,13 +178,7 @@ export default function TravelRoutePage() {
                     </div>
                 </div>
 
-                {/* Next Button */}
-                <div style={styles.nextButtonWrapper}>
-                    <button className="next-btn" style={styles.nextButton}>
-                        <span>다음 단계로</span>
-                        <ChevronRight size={24} style={{ transition: 'transform 0.3s ease' }} />
-                    </button>
-                </div>
+                
             </div>
         </div>
     );
@@ -202,7 +196,7 @@ const styles = {
     },
     threeColumnGrid: {
         display: 'grid',
-        gridTemplateColumns: '400px 1fr 400px',
+        gridTemplateColumns: '720px 1fr 400px',
         gap: '30px',
         marginBottom: '40px',
     },
@@ -238,7 +232,7 @@ const styles = {
     },
     tripImage: {
         width: '100%',
-        height: '300px',
+        height: '500px',
         objectFit: 'cover',
         borderRadius: '15px',
         boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
@@ -248,6 +242,8 @@ const styles = {
         borderRadius: '20px',
         padding: '20px',
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+        width: '400px',
+        
     },
     avatarGroup: {
         display: 'flex',
