@@ -23,14 +23,22 @@ const ModalOverlay = styled.div<{ isOpen: boolean }>`
 `;
 
 const ModalContent = styled.div`
-  background-color: ${({ theme }) => theme.colors.white};
+  background-color: ${({ theme }) => theme.colors.white}; //
   padding: 2.5rem 2rem;
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  
   width: 100%;
-  max-width: 400px;
-  position: relative; /* 닫기 버튼 위치 기준 */
+  max-width: 400px; 
+  position: relative; 
   text-align: center;
+  box-sizing: border-box; 
+
+  @media (max-width: 480px) {
+    max-width: 90%; 
+    max-width: calc(100% - 2rem);
+    padding: 2rem 1.5rem;
+  }
 `;
 
 const CloseButton = styled.button`
