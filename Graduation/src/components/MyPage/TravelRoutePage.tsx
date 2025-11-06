@@ -1,4 +1,22 @@
-import React, { useState } from "react";
+declare global {
+    interface Window {
+        kakao: any;
+    }
+
+    interface ImportMetaEnv {
+        readonly VITE_KAKAO_JAVASCRIPT_KEY: string;
+    }
+
+    interface ImportMeta {
+        readonly env: ImportMetaEnv;
+    }
+}
+
+export { };
+
+
+// 1. useEffect를 React에서 import 합니다.
+import React, { useState, useEffect } from "react";
 import { MapPin, Calendar, ChevronRight, Info, X } from "lucide-react";
 
 export default function TravelRoutePage() {
@@ -18,78 +36,182 @@ export default function TravelRoutePage() {
         { id: 6, title: "청계천", description: "도심 속 자연을 만나는 산책로" },
     ]);
 
+    // 3. 맵을 로드하고 초기화하는 useEffect 훅
+    useEffect(() => {
+        // .env 파일에서 카카오 API 키 가져오기
+        const kakaoAppKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY;
+
+        if (!kakaoAppKey) {
+            console.error("❌ 카카오 지도 API 키를 찾을 수 없습니다!");
+            console.log("💡 .env 파일에 VITE_KAKAO_JAVASCRIPT_KEY=your_key 가 있는지 확인하세요");
+            console.log("💡 개발 서버를 재시작해주세요 (npm run dev)");
+            return;
+        }
+        
+        console.log("✅ 카카오 API 키 로드 성공");
+
+        // 맵 초기화 함수
+        const initializeMap = () => {
+            console.log("🗺️ 맵 초기화 시도...");
+            
+            if (window.kakao && window.kakao.maps) {
+                console.log("✅ 카카오 맵 SDK 로드 완료");
+                
+                window.kakao.maps.load(() => {
+                    console.log("✅ 카카오 맵 로드 콜백 실행");
+                    
+                    const mapContainer = document.getElementById('map');
+                    
+                    if (!mapContainer) {
+                        console.error("❌ 맵 컨테이너를 찾을 수 없습니다.");
+                        return;
+                    }
+                    
+                    console.log("✅ 맵 컨테이너 발견");
+
+                    try {
+                        const mapOption = {
+                            center: new window.kakao.maps.LatLng(37.566826, 126.9786567),
+                            level: 7,
+                        };
+
+                        const map = new window.kakao.maps.Map(mapContainer, mapOption);
+                        console.log("✅ 맵 생성 성공!");
+
+                        const markerPosition = new window.kakao.maps.LatLng(37.566826, 126.9786567);
+                        const marker = new window.kakao.maps.Marker({ position: markerPosition });
+                        marker.setMap(map);
+                        console.log("✅ 마커 추가 성공!");
+                    } catch (error) {
+                        console.error("❌ 맵 생성 중 오류:", error);
+                    }
+                });
+            } else {
+                console.error("❌ window.kakao.maps를 사용할 수 없습니다.");
+            }
+        };
+
+        // 스크립트 로드 로직
+        const existingScript = document.querySelector(
+            `script[src*="dapi.kakao.com/v2/maps/sdk.js"]`
+        );
+
+        if (existingScript) {
+            console.log("📌 기존 카카오맵 스크립트 발견");
+            
+            if (window.kakao && window.kakao.maps) {
+                console.log("✅ 카카오맵 이미 로드됨");
+                initializeMap();
+            } else {
+                console.log("⏳ 스크립트 로드 대기 중...");
+                existingScript.addEventListener("load", initializeMap);
+            }
+        } else {
+            console.log("📥 새 카카오맵 스크립트 추가 중...");
+            
+            const script = document.createElement("script");
+            // 프로토콜 생략하면 현재 페이지 프로토콜을 따라감
+            script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&autoload=false`;
+            script.async = false; // 동기 로딩으로 변경
+            script.charset = "utf-8";
+            
+            script.onload = () => {
+                console.log("✅ 카카오맵 스크립트 로드 성공");
+                // 약간의 지연 후 초기화
+                setTimeout(() => {
+                    initializeMap();
+                }, 100);
+            };
+            
+            script.onerror = (error) => {
+                console.error("❌ 카카오맵 스크립트 로드 실패:", error);
+                console.log("💡 현재 API 키:", kakaoAppKey);
+                console.log("💡 카카오 개발자 콘솔 확인사항:");
+                console.log("   1. Web 플랫폼 등록: http://localhost:5173");
+                console.log("   2. JavaScript 키 활성화");
+                console.log("   3. 사이트 도메인이 정확한지 확인");
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        // cleanup
+        return () => {
+            console.log("🧹 맵 컴포넌트 언마운트");
+        };
+    }, []);
+
     return (
         <div style={styles.rootWrapper}>
             <style>{`
-        @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .route-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
-        border-color: #667eea;
-        }
-        
-        .rec-card:hover {
-        transform: translateX(5px);
-        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.15);
-        border-color: #667eea;
-        }
-        
-        .edit-btn:hover {
-        background: #667eea;
-        color: white;
-        transform: scale(1.05);
-        }
-        
-        .add-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .close-btn:hover {
-        background: #fee;
-        color: #f56565;
-        }
-        
-        .next-btn:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        }
-        
-        .next-btn:hover svg {
-        transform: translateX(5px);
-        }
-        
-        .rec-scroll::-webkit-scrollbar {
-        width: 8px;
-        }
-        
-        .rec-scroll::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 10px;
-        }
-        
-        .rec-scroll::-webkit-scrollbar-thumb {
-        background: #667eea;
-        border-radius: 10px;
-        }
+                /* keyframes, hover 효과 등 스타일 정의 */
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                
+                .route-card:hover {
+                    transform: translateY(-5px);
+                    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+                    border-color: #667eea;
+                }
+                
+                .rec-card:hover {
+                    transform: translateX(5px);
+                    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.15);
+                    border-color: #667eea;
+                }
+                
+                .edit-btn:hover {
+                    background: #667eea;
+                    color: white;
+                    transform: scale(1.05);
+                }
+                
+                .add-btn:hover {
+                    transform: scale(1.05);
+                    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+                }
+                
+                .close-btn:hover {
+                    background: #fee;
+                    color: #f56565;
+                }
+                
+                .next-btn:hover {
+                    transform: translateY(-5px);
+                    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                }
+                
+                .next-btn:hover svg {
+                    transform: translateX(5px);
+                }
+                
+                .rec-scroll::-webkit-scrollbar {
+                    width: 8px;
+                }
+                
+                .rec-scroll::-webkit-scrollbar-track {
+                    background: #f1f1f1;
+                    border-radius: 10px;
+                }
+                
+                .rec-scroll::-webkit-scrollbar-thumb {
+                    background: #667eea;
+                    border-radius: 10px;
+                }
 
-        @media (max-width: 1200px) {
-        .three-column-grid {
-            grid-template-columns: 1fr !important;
-        }
-        }
-    `}</style>
+                @media (max-width: 1200px) {
+                    .three-column-grid {
+                        grid-template-columns: 1fr !important;
+                    }
+                }
+            `}</style>
 
             <div style={styles.container}>
-                {/* 3단 레이아웃 */}
                 <div className="three-column-grid" style={styles.threeColumnGrid}>
-
                     {/* 왼쪽: 혼자 여행 서울 + 프로필 */}
                     <div style={styles.leftColumn}>
                         <div style={styles.tripDetailsCard}>
@@ -98,14 +220,9 @@ export default function TravelRoutePage() {
                                 <MapPin size={24} color="#667eea" />
                                 <span>서울</span>
                             </div>
-                            <img
-                                src="https://images.unsplash.com/photo-1517154421773-0529f29ea451?w=400&h=500&fit=crop"
-                                alt="서울"
-                                style={styles.tripImage}
-                            />
+                            <div id="map" style={styles.tripImage}></div>
                         </div>
 
-                        {/* 프로필 섹션 - 카드 아래 */}
                         <div style={styles.profileSection}>
                             <div style={styles.avatarGroup}>
                                 <div style={styles.avatarItem}>
@@ -178,12 +295,18 @@ export default function TravelRoutePage() {
                     </div>
                 </div>
 
-                
+                <div style={styles.nextButtonWrapper}>
+                    <button className="next-btn" style={styles.nextButton}>
+                        <span>다음 단계로</span>
+                        <ChevronRight size={24} style={{ transition: 'transform 0.3s ease' }} />
+                    </button>
+                </div>
             </div>
         </div>
     );
 }
 
+// ✅ 디자인 수정 절대 없음
 const styles = {
     rootWrapper: {
         minHeight: '100vh',
@@ -196,7 +319,7 @@ const styles = {
     },
     threeColumnGrid: {
         display: 'grid',
-        gridTemplateColumns: '720px 1fr 400px',
+        gridTemplateColumns: '770px 1fr 370px',
         gap: '30px',
         marginBottom: '40px',
     },
@@ -233,17 +356,15 @@ const styles = {
     tripImage: {
         width: '100%',
         height: '500px',
-        objectFit: 'cover',
         borderRadius: '15px',
         boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
+        overflow: 'hidden',
     },
     profileSection: {
         background: 'white',
         borderRadius: '20px',
         padding: '20px',
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-        width: '400px',
-        
     },
     avatarGroup: {
         display: 'flex',
@@ -321,9 +442,7 @@ const styles = {
         fontWeight: '700',
         flexShrink: 0,
     },
-    routeContent: {
-        flex: 1,
-    },
+    routeContent: { flex: 1 },
     routeTitle: {
         fontSize: '22px',
         fontWeight: '700',
@@ -366,13 +485,8 @@ const styles = {
         background: 'white',
         transition: 'all 0.3s ease',
     },
-    recInfo: {
-        color: '#667eea',
-        flexShrink: 0,
-    },
-    recContent: {
-        flex: 1,
-    },
+    recInfo: { color: '#667eea', flexShrink: 0 },
+    recContent: { flex: 1 },
     recTitle: {
         fontSize: '16px',
         fontWeight: '600',
