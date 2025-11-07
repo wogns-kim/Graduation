@@ -1,5 +1,7 @@
-import React, { useState } from "react"; // 1. useState를 명시적으로 import
+import React, { useState } from "react";
 import styled from "@emotion/styled";
+// [수정] 페이지 이동을 위해 useNavigate를 import 합니다.
+import { useNavigate } from "react-router-dom";
 
 // 데이터를 객체 배열로 깔끔하게 분리
 const categories = [
@@ -32,7 +34,7 @@ const categories = [
     },
 ];
 
-// 2. [오류 수정] styled-component가 받을 props 타입을 정의합니다.
+// 1. [오류 수정] styled-component가 받을 props 타입을 정의
 interface KeywordButtonProps {
     isSelected: boolean;
 }
@@ -41,9 +43,17 @@ interface NavButtonProps {
     primary?: boolean; // ?는 optional(있어도 되고 없어도 되는) 속성이라는 의미
 }
 
+// 2. [추가] 백엔드의 '취향 저장' API 주소를 정의합니다.
+// (users.py의 @router.put("/me/preferences") 경로와 일치)
+const PREFERENCES_API_URL = "http://127.0.0.1:8000/api/users/me/preferences";
+
+
 export default function Taste() {
     // 3. [오류 수정] useState의 타입으로 Set<string>을 명시합니다.
     const [selectedKeywords, setSelectedKeywords] = useState(new Set<string>());
+    
+    // [추가] useNavigate 훅을 준비합니다.
+    const navigate = useNavigate();
 
     // 4. [오류 수정] keyword 매개변수의 타입을 string으로 명시합니다.
     const toggleKeyword = (keyword: string) => {
@@ -56,6 +66,60 @@ export default function Taste() {
             }
             return newSet;
         });
+    };
+
+    // [추가] 'NEXT' 버튼 클릭 시 실행될 함수
+    const handleSubmitPreferences = async () => {
+        if (selectedKeywords.size === 0) {
+            alert("취향을 1개 이상 선택해주세요!");
+            return;
+        }
+
+        // 백엔드에 저장하기 위해 JWT 토큰을 localStorage에서 가져옵니다.
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            alert("로그인 정보가 유효하지 않습니다. 다시 로그인해주세요.");
+            navigate("/"); // 로그인 정보 없으면 홈으로
+            return;
+        }
+
+        // Set을 Array로 변환하여 body에 담습니다.
+        const preferencesList = Array.from(selectedKeywords);
+
+        try {
+            // 백엔드의 '취향 저장' API 호출
+            const response = await fetch(PREFERENCES_API_URL, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    // JWT 토큰을 Bearer 형식으로 헤더에 추가
+                    "Authorization": `Bearer ${token}` 
+                },
+                body: JSON.stringify({ preferences: preferencesList }),
+            });
+
+            if (!response.ok) {
+                // 401(인증 실패) 등 오류 처리
+                if (response.status === 401) {
+                    alert("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
+                    localStorage.removeItem("access_token");
+                    navigate("/");
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '취향 저장에 실패했습니다.');
+                }
+                return; // 오류 발생 시 여기서 중단
+            }
+
+            // 저장 성공 시
+            alert("취향이 성공적으로 저장되었습니다!");
+            // 메인 페이지로 이동
+            navigate("/"); 
+
+        } catch (error) {
+            console.error("취향 저장 API 오류:", error);
+            alert(`오류 발생: ${String(error)}`);
+        }
     };
 
     return (
@@ -95,9 +159,9 @@ export default function Taste() {
             </MainGrid>
 
             <NavContainer>
-                {/* NavButton은 primary prop을 받을 수 있다고 알려줘야 합니다. */}
-                <NavButton>PREVIOUS</NavButton>
-                <NavButton primary>NEXT</NavButton>
+                {/* [수정] 버튼에 onClick 핸들러 연결 */}
+                <NavButton onClick={() => navigate(-1)}>PREVIOUS</NavButton>
+                <NavButton primary onClick={handleSubmitPreferences}>NEXT</NavButton>
             </NavContainer>
         </Container>
     );
