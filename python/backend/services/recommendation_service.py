@@ -3,13 +3,14 @@
 # 프론트엔드의 취향 카테고리를 DB와 매핑합니다.
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text # text를 import하여 Raw SQL 실행
+from sqlalchemy import func, text
 from models import models
-import google.generativeai as genai # 무료 Gemini API 사용
+import google.generativeai as genai
 import os
 import json
-from typing import List
-import traceback # 오류 추적용
+from typing import List, Optional # Optional 추가
+import traceback
+from datetime import datetime # 날짜 계산을 위해 import
 
 # .env 파일에서 환경 변수(API 키 등)를 로드합니다.
 from dotenv import load_dotenv
@@ -40,56 +41,66 @@ TAG_TO_CATEGORY_MAP = {
 
 # --- 2. Gemini API 설정 ---
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # .env 파일에서 키를 읽어옴
-
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
 else:
-    print("="*50)
     print("경고: GOOGLE_API_KEY가 .env 파일에 설정되지 않았습니다.")
-    print("AI 추천 기능이 작동하지 않거나 가짜(Dummy) 응답으로 대체됩니다.")
-    print("="*50)
 
-def get_ai_recommendations(preferences: List[str], db: Session):
+
+def get_ai_recommendations(preferences: List[str], db: Session, start_date: Optional[str], end_date: Optional[str]):
     """
-    사용자의 취향(preferences)과 DB 데이터를 매핑하여
-    AI가 맞춤형 여행 코스를 생성하도록 요청합니다.
+    사용자의 취향(preferences)과 '여행 기간'에 맞는
+    AI 맞춤형 여행 코스와 '대안 장소'를 생성하도록 요청합니다.
     """
     
-    # --- 1. 취향(tags)을 DB 카테고리 키워드로 '번역' ---
+    # --- 1. 여행 기간 계산 ---
+    duration_str = "2박 3일" # 기본값
+    if start_date and end_date:
+        try:
+            d1 = datetime.strptime(start_date, "%Y-%m-%d")
+            d2 = datetime.strptime(end_date, "%Y-%m-%d")
+            duration_days = (d2 - d1).days
+            if duration_days < 0:
+                duration_str = "2박 3일" # 날짜 오류 시 기본값
+            elif duration_days == 0:
+                duration_str = "당일치기"
+            else:
+                duration_str = f"{duration_days}박 {duration_days + 1}일"
+        except ValueError:
+            print(f"[AI 서비스] 날짜 형식이 잘못되었습니다. 기본값(2박 3일) 사용.")
+            duration_str = "2박 3일" # 날짜 형식 오류 시 기본값
+            
+    print(f"[AI 서비스] 여행 기간: {duration_str}")
+
+    # --- 2. 취향(tags)을 DB 카테고리 키워드로 '번역' (기존과 동일) ---
     db_keywords = []
-    mood_keywords = [] # 분위기/스타일 키워드
-    
+    mood_keywords = [] 
     for tag in preferences:
         if tag in TAG_TO_CATEGORY_MAP:
             mapped_values = TAG_TO_CATEGORY_MAP[tag]
-            if mapped_values:
-                db_keywords.extend(mapped_values)
-            else:
-                mood_keywords.append(tag)
-    
+            if mapped_values: db_keywords.extend(mapped_values)
+            else: mood_keywords.append(tag)
+
     db_keywords = list(set(db_keywords)) # 중복 제거
     print(f"[AI 서비스] 번역된 DB 키워드: {db_keywords}")
     print(f"[AI 서비스] 분위기/스타일 키워드: {mood_keywords}")
 
-    # --- 2. '번역된' 키워드로 DB에서 '인기 장소' 조회 ---
+    # --- 3. '번역된' 키워드로 DB에서 '인기 장소' 조회 ---
     popular_places = []
     if db_keywords:
         try:
             # category LIKE '%음식점%' OR category LIKE '%카페%' ...
             like_conditions = " OR ".join([f"PLACES.category LIKE %s" for kw in db_keywords])
-            like_params = [f"%{kw}%" for kw in db_keywords] # LIKE 검색용 파라미터
+            like_params = [f"%{kw}%" for kw in db_keywords]
             
             # ITINERARY_ITEMS에 많이 언급된 순서(인기순)로 장소 Top 10 조회
             query_sql = f"""
                 SELECT PLACES.place_name
-                FROM PLACES
-                JOIN ITINERARY_ITEMS ON PLACES.place_id = ITINERARY_ITEMS.place_id
+                FROM PLACES JOIN ITINERARY_ITEMS ON PLACES.place_id = ITINERARY_ITEMS.place_id
                 WHERE {like_conditions}
                 GROUP BY PLACES.place_id, PLACES.place_name
-                ORDER BY COUNT(ITINERARY_ITEMS.item_id) DESC
-                LIMIT 10;
+                ORDER BY COUNT(ITINERARY_ITEMS.item_id) DESC LIMIT 10;
             """
-            
             results = db.execute(text(query_sql), tuple(like_params)).fetchall()
             popular_places = [row[0] for row in results]
         except Exception as e:
@@ -99,10 +110,10 @@ def get_ai_recommendations(preferences: List[str], db: Session):
     
     print(f"[AI 서비스] 조회된 인기 장소: {popular_places}")
 
-    # --- 3. AI에게 보낼 '최종 지시서'(프롬프트) 생성 ---
+    # --- 4. AI에게 보낼 '최종 지시서'(프롬프트) 생성 (여행 기간, 대안 장소 추가) ---
     prompt = f"""
     당신은 최고의 서울 여행 전문가입니다.
-    다음 조건을 만족하는 완벽한 2박 3일 서울 여행 코스를 생성해 주세요.
+    다음 조건을 만족하는 완벽한 {duration_str} 서울 여행 코스를 생성해 주세요.
 
     [사용자 취향]
     - 핵심 활동 키워드: {', '.join(db_keywords) if db_keywords else '지정 안 함'}
@@ -113,52 +124,49 @@ def get_ai_recommendations(preferences: List[str], db: Session):
     {', '.join(popular_places) if popular_places else '특정 인기 장소 없음'}
 
     [출력 형식]
-    - 반드시 'theme'과 'route' 키를 가진 JSON 객체의 리스트 형식으로만 응답해 주세요.
-    - 'theme'은 각 추천 코스의 주제입니다 (예: "힐링과 미식을 겸비한 서울 2박 3일").
-    - 'route'는 'DAY 1', 'DAY 2', 'DAY 3'를 키로 가지고, 각 값은 장소 이름의 리스트입니다.
-    - 예시: 
+    - 반드시 'theme', 'route', 'alternatives' 키를 가진 JSON 객체의 리스트 형식으로만 응답해 주세요.
+    - 'theme'은 각 추천 코스의 주제입니다.
+    - 'route'는 'DAY 1', 'DAY 2' 등 여행 기간({duration_str})에 맞춘 날짜별 장소 이름 리스트입니다.
+    - 'alternatives'는 'route'에 포함된 각 장소별로, 비슷한 분위기의 '대안 장소' 2곳을 추천하는 딕셔너리입니다.
+    - 예시 (1박 2일의 경우): 
     [
       {{
-        "theme": "서울 힐링과 맛집 탐방 코스",
+        "theme": "서울 힐링과 맛집 1박 2일",
         "route": {{
-          "DAY 1": ["서울숲", "성수동 카페거리", "뚝섬 한강공원"],
-          "DAY 2": ["경복궁", "국립현대미술관", "다운타우너 안국"],
-          "DAY 3": ["N서울타워", "명동교자"]
-        }}
-      }},
-      {{
-        "theme": "또 다른 추천 코스",
-        "route": {{ 
-          "DAY 1": ["장소A", "장소B"],
-          "DAY 2": ["장소C"],
-          "DAY 3": ["장소D", "장소E"]
+          "DAY 1": ["서울숲", "성수동 카페거리"],
+          "DAY 2": ["경복궁", "국립현대미술관"]
+        }},
+        "alternatives": {{
+          "서울숲": ["올림픽공원", "선유도공원"],
+          "성수동 카페거리": ["연남동 카페거리", "압구정 로데오"],
+          "경복궁": ["창덕궁", "덕수궁"],
+          "국립현대미술관": ["리움미술관", "DDP(동대문디자인플라자)"]
         }}
       }}
     ]
     """
     
-    # --- 4. Gemini API 호출 ---
+    # --- 5. Gemini API 호출 ---
     if not GOOGLE_API_KEY:
         print("[AI 서비스] API 키가 없어 가짜(Dummy) 응답을 반환합니다.")
+        # ... (가짜 응답 반환)
         return [
             {
                 "theme": "가짜 힐링 코스 (API 키 없음)", 
-                "route": {
-                    "DAY 1": ["서울숲 (샘플)", "근처 카페 (샘플)"], 
-                    "DAY 2": ["경복궁 (샘플)"], 
-                    "DAY 3": []
+                "route": {"DAY 1": ["서울숲 (샘플)", "근처 카페 (샘플)"]}, 
+                "alternatives": {
+                    "서울숲 (샘플)": ["올림픽공원 (샘플)", "선유도공원 (샘플)"],
+                    "근처 카페 (샘플)": ["다른 카페 (샘플)"]
                 }
             }
         ]
 
     try:
         model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        # JSON 출력을 명시적으로 요청 (Gemini 최신 기능)
         response = model.generate_content(
             prompt,
             generation_config={"response_mime_type": "application/json"}
         )
-        
         print(f"[AI 서비스] AI 응답 수신 완료.")
         # .text로 JSON 문자열을 가져와 파싱
         return json.loads(response.text) 

@@ -60,9 +60,10 @@ class TripDetailsResponse(BaseModel):
 # --- Recommendation (recommend.py에서 사용) ---
 class RecommendationResponse(BaseModel):
     theme: str
-    # "DAY 1": ["장소1", "장소2"] 와 같은 객체(Dict) 형식으로 받도록 수정
+    # "DAY 1": ["장소1", "장소2"] 와 같은 객체(Dict) 형식
     route: Dict[str, List[str]]
+    # (추가) "장소1": ["대안장소A", "대안장소B"] 와 같은 대안 장소 목록
+    alternatives: Optional[Dict[str, List[str]]] = None
 
     class Config:
-        orm_mode = True # SQLAlchemy 모델과 호환되도록 설정 (현재는 불필요)
-        from_attributes = True # Pydantic V2 호환성
+        from_attributes = True

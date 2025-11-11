@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import traceback # Traceback import
 
 # 우리 프로젝트의 다른 모듈들을 가져옵니다.
 from database import database
@@ -16,8 +17,11 @@ router = APIRouter()
 
 @router.get("/", response_model=List[schemas.RecommendationResponse]) # 응답 형식 지정
 def get_recommendations(
+    # 메인 페이지에서 입력받을 여행 시작일과 종료일
+    start_date: Optional[str] = Query(None, description="여행 시작일 (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="여행 종료일 (YYYY-MM-DD)"),
+
     # 프론트엔드에서 preferences 파라미터를 쿼리로 받을 수 있음 (선택 사항)
-    # 예: /?preferences=%23힐링&preferences=%23맛집탐방
     preferences: Optional[List[str]] = Query(None),
     
     # DB 세션과 현재 로그인된 사용자를 자동으로 가져옴
@@ -25,35 +29,34 @@ def get_recommendations(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    사용자의 취향에 맞는 여행 코스를 AI로 생성하여 반환합니다.
-    - 1순위: 요청 URL에 'preferences'가 있으면, 그 취향을 사용합니다. (취향 재설정)
+    사용자의 취향과 여행 날짜에 맞는 여행 코스를 AI로 생성하여 반환합니다.
+    - 1순위: 요청 URL에 'preferences'가 있으면, 그 취향을 사용합니다.
     - 2순위: 요청 URL에 'preferences'가 없으면, DB에 저장된 사용자의 취향을 사용합니다.
     """
     
     final_preferences = []
     
     if preferences:
-        # 1. 프론트엔드가 URL 쿼리로 새 취향을 보낸 경우 (즉시 추천)
         print(f"[API] URL 쿼리에서 새 취향 사용: {preferences}")
         final_preferences = preferences
     elif current_user.preferences:
-        # 2. URL에 취향이 없고, DB에 저장된 취향이 있는 경우
         print(f"[API] DB에 저장된 사용자 취향 사용: {current_user.preferences}")
         final_preferences = current_user.preferences.split(',')
     else:
-        # 3. URL에도 없고, DB에도 없는 경우 (취향 선택 전)
-        # 이 경우, 프론트엔드는 이 API를 호출하기 전에 /taste 페이지로 보내야 하지만,
-        # 만약의 경우를 대비해 기본 추천을 요청합니다.
         print("[API] 사용 가능한 취향 정보 없음. 기본 추천 시도.")
-        final_preferences = [] # 빈 리스트로 보내면 서비스 로직이 알아서 처리
+        final_preferences = [] 
 
     try:
-        # '전문 셰프'(recommendation_service)에게 실제 AI 추천 생성을 요청
-        recommendations = recommendation_service.get_ai_recommendations(final_preferences, db)
+        # '전문 셰프'에게 날짜 정보까지 함께 전달
+        recommendations = recommendation_service.get_ai_recommendations(
+            preferences=final_preferences, 
+            db=db, 
+            start_date=start_date, 
+            end_date=end_date
+        )
         
         if not recommendations:
              print("[API] AI가 추천을 생성하지 못했거나 빈 결과를 반환했습니다.")
-             # 빈 리스트를 반환해도 괜찮음
         
         return recommendations
 
