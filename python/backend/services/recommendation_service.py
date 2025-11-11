@@ -9,7 +9,9 @@ import google.generativeai as genai # 무료 Gemini API 사용
 import os
 import json
 from typing import List
-import traceback
+import traceback # 오류 추적용
+
+# .env 파일에서 환경 변수(API 키 등)를 로드합니다.
 from dotenv import load_dotenv
 load_dotenv() 
 
@@ -88,7 +90,6 @@ def get_ai_recommendations(preferences: List[str], db: Session):
                 LIMIT 10;
             """
             
-            # SQLAlchemy의 text()를 사용하여 SQL을 실행하고 파라미터를 전달
             results = db.execute(text(query_sql), tuple(like_params)).fetchall()
             popular_places = [row[0] for row in results]
         except Exception as e:
