@@ -26,7 +26,7 @@ db_config = {
 # 각 trip_id, shareable_link_id는 고유해야 합니다.
 SAMPLE_TRIPS = [
     {
-        "trip_id": 2, # 1번은 'crawler_bot'이 사용 중
+        "trip_id": 14,
         "trip_name": "샘플 코스 1 (경복궁/안국 힐링)",
         "shareable_link_id": "sample-course-1",
         "days": [
@@ -37,7 +37,7 @@ SAMPLE_TRIPS = [
         ]
     },
     {
-        "trip_id": 3,
+        "trip_id": 15,
         "trip_name": "샘플 코스 2 (서울숲/성수 핫플)",
         "shareable_link_id": "sample-course-2",
         "days": [
@@ -48,7 +48,7 @@ SAMPLE_TRIPS = [
         ]
     },
     {
-        "trip_id": 4,
+        "trip_id": 16,
         "trip_name": "샘플 코스 3 (강남/잠실)",
         "shareable_link_id": "sample-course-3",
         "days": [
@@ -57,7 +57,63 @@ SAMPLE_TRIPS = [
                 "places": ["코엑스 별마당 도서관", "롯데월드타워", "송리단길"]
             }
         ]
+    },
+     {
+        "trip_id": 17,
+        "trip_name": "샘플 코스 4 (강남/논현)",
+        "shareable_link_id": "sample-course-4",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["오하라식당교토", "무신사 스탠다드 강남점", "셀렉티드마롱"]
+            }
+        ]
+    },
+    {
+        "trip_id": 18,
+        "trip_name": "샘플 코스 5 (강남/잠원)",
+        "shareable_link_id": "sample-course-5",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["잠원 한강공원", "잠원떡볶이", "뉴코아아울렛 강남점"]
+            }
+        ]
+    },
+    {
+        "trip_id": 19,
+        "trip_name": "샘플 코스 5 (용산/후암)",
+        "shareable_link_id": "sample-course-6",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["패스로스터스", "후암돈까스", "백범김구선생상"]
+            }
+        ]
+    },
+    {
+        "trip_id": 20,
+        "trip_name": "샘플 코스 5 (동작/이수)",
+        "shareable_link_id": "sample-course-7",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["쁠랑떼", "오센", "애플하우스"]
+            }
+        ]
+    },
+    {
+        "trip_id": 21,
+        "trip_name": "샘플 코스 5 (강남/압구정)",
+        "shareable_link_id": "sample-course-7",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["현대백화점 압구정본점", "씨네드쉐프 압구정", "파티클리에","누데이크 하우스 노웨어 도산"]
+            }
+        ]
     }
+    
 ]
 
 def get_place_details_from_kakao(place_name):
