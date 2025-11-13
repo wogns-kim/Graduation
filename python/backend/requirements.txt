@@ -5,7 +5,13 @@ sqlalchemy
 mysql-connector-python
 
 pydantic
-python-dotenv
+python-dotenv  # .env 파일 관리를 위해 추가
 
-openai
 requests
+google-generativeai # Gemini API 사용
+
+python-jose[cryptography] # JWT 토큰 관리
+
+selenium
+webdriver-manager
+beautifulsoup4

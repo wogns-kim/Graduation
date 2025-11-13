@@ -10,7 +10,7 @@ class UserSimple(BaseModel):
     profile_image_url: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Kakao Login (users.py에서 사용) ---
 class KakaoCode(BaseModel):
@@ -19,6 +19,7 @@ class KakaoCode(BaseModel):
 class Token(BaseModel): # JWT 토큰 응답용
     access_token: str
     token_type: str
+    next_action: Optional[str] = None # 로그인 후 다음 이동 경로
 
 # --- Preferences (users.py에서 사용) ---
 class UserPreferencesUpdate(BaseModel):
@@ -38,7 +39,7 @@ class Trip(BaseModel):
     shareable_link_id: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- ItineraryItem ---
 class ItineraryItem(BaseModel):
@@ -47,7 +48,7 @@ class ItineraryItem(BaseModel):
     order_in_day: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Trip Details ---
 class TripDetailsResponse(BaseModel):
@@ -59,11 +60,8 @@ class TripDetailsResponse(BaseModel):
 
 # --- Recommendation (recommend.py에서 사용) ---
 class RecommendationResponse(BaseModel):
-    theme: str
-    # "DAY 1": ["장소1", "장소2"] 와 같은 객체(Dict) 형식
-    route: Dict[str, List[str]]
-    # (추가) "장소1": ["대안장소A", "대안장소B"] 와 같은 대안 장소 목록
-    alternatives: Optional[Dict[str, List[str]]] = None
+    route: Dict[str, List[str]] # "DAY 1": ["장소1", "장소2"] ...
+    alternatives: Optional[List[str]] = None # "대안장소A", "대안장소B" ...
 
     class Config:
         from_attributes = True

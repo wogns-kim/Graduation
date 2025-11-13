@@ -47,7 +47,6 @@ def get_recommendations(
         final_preferences = [] 
 
     try:
-        # '전문 셰프'에게 날짜 정보까지 함께 전달
         recommendations = recommendation_service.get_ai_recommendations(
             preferences=final_preferences, 
             db=db, 
