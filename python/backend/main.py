@@ -40,4 +40,4 @@ app.include_router(api_router, prefix="/api")
 # 기본 경로('/')에 대한 간단한 응답
 @app.get("/")
 def read_root():
-    return {"message": "FIRST TRIP 백엔드 서버에 오신 것을 환영합니다!"}
+    return {"message": "FIRST TRIP 백엔드 서버"}

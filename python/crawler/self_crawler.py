@@ -57,6 +57,61 @@ SAMPLE_TRIPS = [
                 "places": ["코엑스 별마당 도서관", "롯데월드타워", "송리단길"]
             }
         ]
+    },
+     {
+        "trip_id": 5,
+        "trip_name": "샘플 코스 4 (강남/논현)",
+        "shareable_link_id": "sample-course-4",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["오하라식당교토", "무신사 스탠다드 강남점", "셀렉티드마롱"]
+            }
+        ]
+    },
+    {
+        "trip_id": 6,
+        "trip_name": "샘플 코스 5 (강남/잠원)",
+        "shareable_link_id": "sample-course-5",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["잠원 한강공원", "잠원떡볶이", "뉴코아아울렛 강남점"]
+            }
+        ]
+    },
+    {
+        "trip_id": 7,
+        "trip_name": "샘플 코스 5 (용산/후암)",
+        "shareable_link_id": "sample-course-6",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["패스로스터스", "후암돈까스", "백범김구선생상"]
+            }
+        ]
+    },
+    {
+        "trip_id": 8,
+        "trip_name": "샘플 코스 5 (동작/이수)",
+        "shareable_link_id": "sample-course-7",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["쁠랑떼", "오센", "애플하우스"]
+            }
+        ]
+    },
+    {
+        "trip_id": 9,
+        "trip_name": "샘플 코스 5 (강남/압구정)",
+        "shareable_link_id": "sample-course-7",
+        "days": [
+            {
+                "day_str": "DAY 1",
+                "places": ["현대백화점 압구정본점", "씨네드쉐프 압구정", "파티클리에","누데이크 하우스 노웨어 도산"]
+            }
+        ]
     }
 ]
 
