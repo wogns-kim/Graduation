@@ -236,9 +236,10 @@ if __name__ == '__main__':
         'https://blog.naver.com/neweunha/222872061646',
         'https://alinou.tistory.com/14',
         'https://thffhahsgud.tistory.com/entry/%EC%84%9C%EC%9A%B8%EC%97%AC%ED%96%89-2%EB%B0%95-3%EC%9D%BC-%EB%8F%99%EC%84%A0-%EC%97%AD%EC%82%AC-%ED%98%84%EB%8C%80-%EB%A7%9B%EC%A7%91%EC%9D%B4-%EC%96%B4%EC%9A%B0%EB%9F%AC%EC%A7%84-%EC%99%84%EB%B2%BD%ED%95%9C-%EC%9D%BC%EC%A0%95',
-        'https://blog.naver.com/zinizio/223875017465',
-        'https://blog.naver.com/yhth27/224070324883',
-        'https://blog.naver.com/davi-kim/224008485524'
+        'https://blog.naver.com/zinizio/223875017465', # 추가
+        'https://blog.naver.com/yhth27/224070324883' # 추가
+        'https://blog.naver.com/davi-kim/224008485524'  #추가
+
     ]
 
     print(f"총 {len(urls_to_crawl)}개의 URL에 대한 동선 추출 및 DB 저장을 시작합니다.")
