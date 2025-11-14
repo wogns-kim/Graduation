@@ -51,3 +51,10 @@ class ItineraryItem(Base):
 
     __table_args__ = (UniqueConstraint('trip_id', 'visit_day_str', 'order_in_day', name='unique_itinerary_constraint'),)
 
+class Category(Base): # 👈 Category 모델 추가
+    __tablename__ = "CATEGORIES"
+    category_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), unique=True, nullable=False, index=True)
+    places = relationship("Place", back_populates="category_rel")
+
+    
