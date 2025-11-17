@@ -58,10 +58,22 @@ class TripDetailsResponse(BaseModel):
     # 예: { "user_id_1": { "DAY 1": [...], "DAY 2": [...] } }
     itineraries: Dict[str, Dict[str, List[ItineraryItem]]]
 
+class PlaceSchema(BaseModel):
+    # Place ORM 모델의 place_name 필드를 Pydantic에서는 name으로 사용
+    name: str = Field(..., alias="place_name")
+    latitude: float
+    longitude: float
+
+    class Config:
+        # Pydantic이 ORM 객체에서 데이터를 읽어올 수 있도록 설정
+        orm_mode = True
+        from_attributes = True
+        
 # --- Recommendation (recommend.py에서 사용) ---
 class RecommendationResponse(BaseModel):
     route: Dict[str, List[str]] # "DAY 1": ["장소1", "장소2"] ...
     alternatives: Optional[List[str]] = None # "대안장소A", "대안장소B" ...
 
     class Config:
+        orm_mode = True
         from_attributes = True
