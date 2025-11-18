@@ -63,6 +63,23 @@ CREATE TABLE IF NOT EXISTS ITINERARY_ITEMS (
     UNIQUE KEY unique_itinerary (trip_id, visit_day_str, order_in_day)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='여행 일정 항목';
 
+-- 여행 일정의 모든 변경 이력을 저장하는 '로그' 테이블
+CREATE TABLE IF NOT EXISTS TRIP_ACTIONS (
+    action_id INT PRIMARY KEY AUTO_INCREMENT COMMENT '변경 이력 고유 ID',
+    trip_id INT NOT NULL COMMENT '어떤 여행에 대한 이력인지',
+    user_id INT NOT NULL COMMENT '누가 변경했는지',
+    action_type VARCHAR(20) NOT NULL COMMENT '어떤 행동을 했는지 (ADD, DELETE, REORDER)',
+    -- 되돌리기에 필요한 이전 상태 정보를 JSON 문자열로 저장
+    previous_state TEXT NULL COMMENT '되돌리기를 위한 이전 상태 정보 (JSON)',
+    -- (참고) ADD 액션의 경우, 되돌리려면 '추가된 item_id'를 알아야 하므로
+    -- 이 필드를 활용하거나 previous_state에 {"item_id": 123} 형식으로 저장합니다.
+    item_id_affected INT NULL COMMENT '추가/삭제된 아이템 ID',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '언제 변경했는지',
+    
+    FOREIGN KEY (trip_id) REFERENCES TRIPS(trip_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES USERS(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='여행 수정 이력 (Undo용)';
+
 -- 4. 시스템 기본 데이터 삽입
 INSERT IGNORE INTO USERS (user_id, kakao_id, username, email) VALUES (1, 0, 'crawler_bot', 'crawler@firsttrip.com');
 
