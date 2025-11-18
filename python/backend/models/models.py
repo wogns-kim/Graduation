@@ -51,7 +51,6 @@ class ItineraryItem(Base):
     order_in_day = Column(Integer, nullable=False)
     __table_args__ = (UniqueConstraint('trip_id', 'visit_day_str', 'order_in_day', name='unique_itinerary_constraint'),)
 
-<<<<<<< HEAD
 class TripAction(Base):
     __tablename__ = "TRIP_ACTIONS"
     
@@ -68,12 +67,3 @@ class Category(Base):
     category_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False, index=True)
     places = relationship("Place", back_populates="category_rel")
-=======
-class Category(Base): # 👈 Category 모델 추가
-    __tablename__ = "CATEGORIES"
-    category_id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, nullable=False, index=True)
-    places = relationship("Place", back_populates="category_rel")
-
-    
->>>>>>> cd2432d12f5c7d27584909cafd89bdb227316c5a
