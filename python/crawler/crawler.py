@@ -24,7 +24,7 @@ KAKAO_API_KEY = "8abfe377ab126ace7e541f101103470d"
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': '',
+    'password': '!j76684133',
     'database': 'first_trip'
 }
 
@@ -227,18 +227,18 @@ def get_blog_content(blog_url):
 # --- 3. 스크립트 실행 부분 ---
 if __name__ == '__main__':
     urls_to_crawl = [
-        'https://blog.naver.com/titibird__/223597650093', 
-        'https://nomadnjobs.tistory.com/1',
-        'https://koreathreads.tistory.com/entry/%EC%84%9C%EC%9A%B8-3%EC%9D%BC-%EC%97%AC%ED%96%89%EC%BD%94%EC%8A%A4-%EC%A0%95%EB%A6%AC%F0%9F%93%B8-%EA%B0%90%EC%84%B1-%EC%9D%B8%EC%83%9D%EC%83%B7-%EB%AA%85%EC%86%8C%EB%B6%80%ED%84%B0-%EC%95%BC%EA%B2%BD%C2%B7%EC%B9%B4%ED%8E%98%EA%B9%8C%EC%A7%80-%EC%99%84%EB%B2%BD-%ED%94%8C%EB%9E%9C',
-        'https://blog.naver.com/jungceo_blog/223115291069',
-        'https://tripinfomation.tistory.com/183',
-        'https://yeahlife.tistory.com/389#google_vignette',
-        'https://blog.naver.com/neweunha/222872061646',
-        'https://alinou.tistory.com/14',
-        'https://thffhahsgud.tistory.com/entry/%EC%84%9C%EC%9A%B8%EC%97%AC%ED%96%89-2%EB%B0%95-3%EC%9D%BC-%EB%8F%99%EC%84%A0-%EC%97%AD%EC%82%AC-%ED%98%84%EB%8C%80-%EB%A7%9B%EC%A7%91%EC%9D%B4-%EC%96%B4%EC%9A%B0%EB%9F%AC%EC%A7%84-%EC%99%84%EB%B2%BD%ED%95%9C-%EC%9D%BC%EC%A0%95',
-        'https://blog.naver.com/zinizio/223875017465', # 추가
-        'https://blog.naver.com/yhth27/224070324883' # 추가
-        'https://blog.naver.com/davi-kim/224008485524'  #추가
+       'https://blog.naver.com/titibird__/223597650093', 
+       'https://nomadnjobs.tistory.com/1',
+        #'https://koreathreads.tistory.com/entry/%EC%84%9C%EC%9A%B8-3%EC%9D%BC-%EC%97%AC%ED%96%89%EC%BD%94%EC%8A%A4-%EC%A0%95%EB%A6%AC%F0%9F%93%B8-%EA%B0%90%EC%84%B1-%EC%9D%B8%EC%83%9D%EC%83%B7-%EB%AA%85%EC%86%8C%EB%B6%80%ED%84%B0-%EC%95%BC%EA%B2%BD%C2%B7%EC%B9%B4%ED%8E%98%EA%B9%8C%EC%A7%80-%EC%99%84%EB%B2%BD-%ED%94%8C%EB%9E%9C',
+        #'https://blog.naver.com/jungceo_blog/223115291069',
+        #'https://tripinfomation.tistory.com/183',
+        #'https://yeahlife.tistory.com/389#google_vignette',
+        #'https://blog.naver.com/neweunha/222872061646',
+        #'https://alinou.tistory.com/14',
+        #'https://thffhahsgud.tistory.com/entry/%EC%84%9C%EC%9A%B8%EC%97%AC%ED%96%89-2%EB%B0%95-3%EC%9D%BC-%EB%8F%99%EC%84%A0-%EC%97%AD%EC%82%AC-%ED%98%84%EB%8C%80-%EB%A7%9B%EC%A7%91%EC%9D%B4-%EC%96%B4%EC%9A%B0%EB%9F%AC%EC%A7%84-%EC%99%84%EB%B2%BD%ED%95%9C-%EC%9D%BC%EC%A0%95',
+        #'https://blog.naver.com/zinizio/223875017465', # 추가
+        #'https://blog.naver.com/yhth27/224070324883' # 추가
+        #'https://blog.naver.com/davi-kim/224008485524'  #추가
 
     ]
 
