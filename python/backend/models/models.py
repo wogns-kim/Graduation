@@ -4,7 +4,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint, BIGINT, DECIMAL, TEXT
 from sqlalchemy.orm import relationship
 from database.database import Base
-from sqlalchemy.sql import func # created_at에 기본 타임스탬프를 찍기 위해
+from sqlalchemy.sql import func
 
 class User(Base):
     __tablename__ = "USERS"
@@ -61,3 +61,9 @@ class TripAction(Base):
     previous_state = Column(TEXT, nullable=True) # JSON 문자열로 이전 상태 저장
     item_id_affected = Column(Integer, nullable=True) # ADD/DELETE 시 대상이 된 item_id
     created_at = Column(TIMESTAMP, server_default=func.now())
+    
+class Category(Base):
+    __tablename__ = "CATEGORIES"
+    category_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), unique=True, nullable=False, index=True)
+    places = relationship("Place", back_populates="category_rel")

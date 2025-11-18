@@ -8,13 +8,21 @@ from models import models
 import google.generativeai as genai
 import os
 import json
-from typing import List, Optional # Optional 추가
+from typing import List, Dict, Tuple, Any, Optional # Optional 추가
 import traceback
 from datetime import datetime # 날짜 계산을 위해 import
 
 # .env 파일에서 환경 변수(API 키 등)를 로드
 from dotenv import load_dotenv
 load_dotenv() 
+
+# 최적화 로직에 필요한 모듈
+from math import radians, sin, cos, sqrt, atan2
+from models import Place 
+# schemas.py의 RecommendationResponse를 RouteResponse로 별칭 지정
+from schemas import PlaceSchema, RecommendationResponse as RouteResponse 
+
+load_dotenv()
 
 # --- 1. '번역기' 정의: 프론트엔드 취향(Key)과 DB 카테고리(Value) 매핑 ---
 # (frontend/select_your_taste.tsx의 categories.keywords와 일치)
@@ -32,10 +40,10 @@ TAG_TO_CATEGORY_MAP = {
     "프리미엄": ["음식점", "레스토랑", "고급"],
 
     # 동행 유형 (이 키워드들은 분위기/스타일 지시에 사용)
-    "나 홀로 여행": [], 
-    "친구/지인": [],
-    "가족 여행": [],
-    "펫 동반 여행": [],
+    "나 홀로 여행": ["도서관","산책로", "혼밥", "힐링", "서점"], 
+    "친구/지인": ["카페", "술집", "방탈출", "게임", "사진관", "핫플레이스"],
+    "가족 여행": ["전통시장", "체험", "공연", "가족식사", "편안한", "대규모"],
+    "펫 동반 여행": ["반려동물", "애견카페", "공원", "야외", "산책로"],
     "아이 동반 여행": ["테마파크", "어린이", "가족공원", "키즈"],
 }
 
@@ -193,3 +201,126 @@ def get_ai_recommendations(preferences: List[str], db: Session, start_date: Opti
         print(f"--- !!! Gemini API 호출 또는 JSON 파싱 중 오류 발생 !!! ---: {e}")
         traceback.print_exc()
         return []
+    
+    # 1. 거리 계산 
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """두 지점 간의 거리를 계산 (Haversine 공식, km 단위)"""
+    R = 6371
+    
+    lat1_rad = radians(lat1)
+    lat2_rad = radians(lat2)
+    delta_lat = radians(lat2 - lat1)
+    delta_lon = radians(lon2 - lon1)
+    
+    a = sin(delta_lat/2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(delta_lon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    distance = R * c
+    
+    return round(distance, 2)
+
+# 최적화
+def nearest_neighbor_route(places: List[PlaceSchema], start_location: Tuple[float, float] = None) -> Tuple[List[str], float]:
+    """
+    Nearest Neighbor 알고리즘을 사용하여 최적 동선 생성 (장소 이름 리스트와 총 거리를 반환)
+    """
+    places_data = [p.model_dump() for p in places]
+    
+    if not places_data:
+        return [], 0.0
+    
+    unvisited = places_data.copy()
+    route = []
+    total_distance = 0.0
+    
+    # 시작 위치 설정 로직 개선
+    if start_location:
+        current_lat, current_lon = start_location
+        closest_to_start = None
+        min_dist_to_start = float('inf')
+        
+        for place in unvisited:
+            dist = calculate_distance(current_lat, current_lon, place['latitude'], place['longitude'])
+            if dist < min_dist_to_start:
+                min_dist_to_start = dist
+                closest_to_start = place
+                
+        if closest_to_start:
+            first_place = closest_to_start
+            unvisited.remove(first_place)
+            route.append(first_place)
+            current_lat = first_place['latitude']
+            current_lon = first_place['longitude']
+            total_distance += min_dist_to_start
+    else:
+        first_place = unvisited.pop(0)
+        route.append(first_place)
+        current_lat = first_place['latitude']
+        current_lon = first_place['longitude']
+    
+    # 가장 가까운 장소
+    while unvisited:
+        nearest_place = None
+        min_distance = float('inf')
+        
+        for place in unvisited:
+            distance = calculate_distance(
+                current_lat, current_lon,
+                float(place['latitude']), float(place['longitude'])
+            )
+            
+            if distance < min_distance:
+                min_distance = distance
+                nearest_place = place
+        
+        if nearest_place:
+            route.append(nearest_place)
+            total_distance += min_distance
+            
+            # 위치 업데이트
+            current_lat = nearest_place['latitude']
+            current_lon = nearest_place['longitude']
+            unvisited.remove(nearest_place)
+        else:
+            break 
+    
+    final_route_names = [place['name'] for place in route]
+            
+    return final_route_names, total_distance
+
+# 메인 함수 (FastAPI에서)
+def get_optimized_route_by_categories(
+    db: Session, 
+    categories: List[str], 
+    start_location: Tuple[float, float] = (37.5665, 126.9780) #서울 시청
+) -> RouteResponse:
+    """
+    주어진 카테고리에 해당하는 장소를 DB에서 조회하고 최적 경로를 계산합니다.
+    """
+    
+    if not categories:
+        return RouteResponse(theme="카테고리 없음", route=[])
+
+    # 1. DB: 카테고리 필터링 (models.py에 맞춤)
+    places_orm = (
+        db.query(Place)
+        .filter(Place.category.in_(categories))
+        .all()
+    )
+    
+    # ORM 객체를 Pydantic 모델 리스트로 변환
+    places = [PlaceSchema.model_validate(p) for p in places_orm]
+
+    if len(places) < 2:
+        return RouteResponse(
+            theme=f"장소 부족 ({', '.join(categories)})", 
+            route=[]
+        )
+
+    # 2. 최적화 실행
+    final_route_names, total_distance = nearest_neighbor_route(places, start_location)
+    
+    # 3. 결과 포맷팅 및 반환
+    return RouteResponse(
+        theme=f"AI 추천 | {', '.join(categories)} | 총 거리: {total_distance}km",
+        route=final_route_names
+    )
