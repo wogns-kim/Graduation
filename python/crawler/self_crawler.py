@@ -18,7 +18,7 @@ KAKAO_API_KEY = "8abfe377ab126ace7e541f101103470d"
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': '',
+    'password': '!j76684133',
     'database': 'first_trip'
 }
 
@@ -33,7 +33,7 @@ SAMPLE_TRIPS = [
             {
                 "day_str": "DAY 1",
                 "places": ["경복궁", "국립현대미술관 서울", "다운타우너 안국", "블루보틀 삼청"]
-            }
+            },
             { 
                 "day_str": "DAY 2",
                 "places": ["사장님돈까스 본점","우미마루","이름없는파스타 이화여대점" ],
@@ -71,7 +71,7 @@ SAMPLE_TRIPS = [
             {
                 "day_str": "DAY 1",
                 "places": ["오하라식당교토", "무신사 스탠다드 강남점", "셀렉티드마롱"]
-            }
+            },
             {
                 "day_str": "DAY 2",
                 "places": ["텍사스브라질 센트럴시티점", "플라워아티장베이터리 가로수", "이스케이프 샵"]
