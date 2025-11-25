@@ -99,7 +99,7 @@ const UserTabs: React.FC<UserTabsProps> = ({ travelLogs }) => {
     // '/travel-route' 경로로 이동합니다.
     // 나중에 logId를 이용해 특정 여행 경로 데이터를 불러오도록 확장할 수 있습니다. (예: navigate(`/travel-route/${logId}`))
     console.log(`Navigating to travel route for log ID: ${logId}`); // 콘솔 로그 추가 (확인용)
-    navigate('/travel-route'); 
+    navigate(`/travel-route/${logId}`); 
   };
 
   return (

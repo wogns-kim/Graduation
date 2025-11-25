@@ -19,6 +19,18 @@ import { cityData } from "../../data/cityData";
 
 // --- 페이지 레이아웃을 위한 스타일 컴포넌트 ---
 
+const seoulDistricts = [
+  { id: 'seoul-1', name: '은평구' },
+  { id: 'seoul-2', name: '동작구' },
+  { id: 'seoul-3', name: '서초구' },
+  { id: 'seoul-4', name: '용산구' },
+];
+
+interface RecommendationItem {
+  id: number | string; // cityData는 number, seoulDistricts는 string
+  name: string;
+}
+
 const PageWrapper = styled.div`
   min-height: 100vh;
   background-color: ${({ theme }) => theme.colors.background};
@@ -33,6 +45,12 @@ const HeroSection = styled.section`
   justify-content: center;
   align-items: center;
   padding: 4rem 1rem;
+`;
+
+const SearchContainer = styled.div`
+  position: relative; /* 추천 목록의 위치 기준이 됨 */
+  flex: 1;
+  min-width: 180px;
 `;
 
 const SearchBar = styled.div`
@@ -142,9 +160,37 @@ const SearchBar = styled.div`
   }
 `;
 
+const RecommendationsList = styled.ul<{ isVisible: boolean }>`
+  display: ${({ isVisible }) => (isVisible ? 'block' : 'none')};
+  position: absolute;
+  top: 100%; /* 검색창 바로 아래에 위치 */
+  left: 0;
+  right: 0;
+  background-color: ${({ theme }) => theme.colors.white}; //
+  border: 1px solid ${({ theme }) => theme.colors.border}; //
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  list-style-type: none;
+  padding: 0.5rem 0;
+  margin: 0;
+  z-index: 10; /* 달력보다 위에 오도록 (필요시 조절) */
+`;
+
+const RecommendationItem = styled.li`
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  color: ${({ theme }) => theme.colors.text}; //
+  cursor: pointer;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.background}; //
+  }
+`;
+
 const SearchInput = styled.input`
   flex: 1;
-  min-width: 180px;
+  min-width: 280px;
   padding: 12px 16px;
   font-size: 16px;
   border: 1px solid ${({ theme }) => theme.colors.border};
@@ -212,9 +258,30 @@ const StyledLink = styled(Link)`
 
 export default function HomePage() {
   const [destination, setDestination] = useState("");
-  const [numPeople, setNumPeople] = useState("");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+
+  const getRecommendationList = (): RecommendationItem[] => {
+    const normalizedInput = destination.toLowerCase().trim();
+
+    // "서울"을 정확히 입력하면 서울의 구 목록을 반환
+    if (normalizedInput === '서울') {
+      return seoulDistricts;
+    }
+
+    // 입력값이 비어있으면 전체 도시 목록을 반환
+    if (normalizedInput === '') {
+      return cityData;
+    }
+
+    // 그 외의 경우, cityData에서 필터링 (예: "부" -> "부산")
+    return cityData.filter(city =>
+      city.name.toLowerCase().includes(normalizedInput)
+    );
+  };
+
+  const currentRecommendations = getRecommendationList();
 
   const handleSearch = () => {
     let dateInfo = "전체";
@@ -226,7 +293,21 @@ export default function HomePage() {
       dateInfo = `${startDate.toLocaleDateString()} -`;
     }
 
-    alert(`검색 정보:\n여행지: ${destination || '전체'}\n인원: ${numPeople || '전체'}\n날짜: ${dateInfo}`);
+    alert(`검색 정보:\n여행지: ${destination || '전체'}\n시작일: ${startDate ? startDate.toLocaleDateString() : '미정'}\n종료일: ${endDate ? endDate.toLocaleDateString() : '미정'}`);
+  };
+
+  const handleRecommendationClick = (item: RecommendationItem) => {
+    // 클릭한 항목이 'seoulDistricts'에 포함된 구 이름인지 확인
+    const isDistrict = seoulDistricts.some(d => d.name === item.name);
+    
+    if (isDistrict) {
+      // 구 이름("은평구")을 클릭하면 "서울 은평구"로 값을 설정
+      setDestination(`서울 ${item.name}`);
+    } else {
+      // 도시 이름("서울")을 클릭하면 해당 도시 이름으로 값을 설정
+      setDestination(item.name);
+    }
+    setShowRecommendations(false); // 목록 숨기기
   };
 
   return (
@@ -236,34 +317,62 @@ export default function HomePage() {
         {/* ... (HeroSection, SearchBar 등은 그대로) ... */}
         <HeroSection>
           <SearchBar>
-            <SearchInput
-              type="text"
-              placeholder="여행지를 선택하세요."
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-            />
-            <SearchInput
-              type="number"
-              placeholder="인원"
-              value={numPeople}
-              onChange={(e) => setNumPeople(e.target.value)}
-            />
+            <SearchContainer>
+              <SearchInput
+                type="text"
+                placeholder="여행지를 선택하세요."
+                value={destination}
+                onChange={(e) => {
+                  setDestination(e.target.value);
+                  setShowRecommendations(true); // 입력 시에도 목록 표시
+                }}
+                onFocus={() => setShowRecommendations(true)} // 포커스 시 목록 표시
+                onBlur={() => {
+                  // 잠시 후 목록 숨기기 (클릭 이벤트가 먼저 실행되도록)
+                  setTimeout(() => setShowRecommendations(false), 150);
+                }}
+              />
+              {/* 👇 7. 추천 검색어 목록 렌더링 */}
+              <RecommendationsList isVisible={showRecommendations && currentRecommendations.length > 0}>
+                {currentRecommendations.map((item) => (
+                  <RecommendationItem
+                    key={item.id}
+                    // onClick 대신 onMouseDown을 사용해야 onBlur보다 먼저 실행됩니다.
+                    onMouseDown={() => handleRecommendationClick(item)}
+                  >
+                    {item.name}
+                  </RecommendationItem>
+                ))}
+              </RecommendationsList>
+            </SearchContainer>
+
             <DatePicker
               locale="ko"
-              selectsRange={true} // 기간 선택 모드 활성화
+              selected={startDate}
+              onChange={(date: Date | null) => setStartDate(date)}
+              selectsStart // 기간 선택의 '시작'임을 명시
               startDate={startDate}
               endDate={endDate}
-              onChange={(update) => {
-                // update는 [startDate, endDate] 형태의 배열입니다.
-                setStartDate(update[0]);
-                setEndDate(update[1]);
-              }}
-              isClearable={true} // 선택 초기화 버튼 활성화
-              placeholderText="시작일 - 종료일 선택"
+              isClearable={true}
+              placeholderText="시작일"
               dateFormat="yyyy-MM-dd"
-              monthsShown={2} // 1. 달력을 2개 표시합니다.
-              minDate={new Date()} // 2. 오늘 이전 날짜는 선택할 수 없도록 막습니다.
-              dateFormatCalendar="yyyy년 LLLL"
+              monthsShown={1} // 달력 1개만 표시
+              minDate={new Date()}
+            />
+            
+            {/* (4) '종료일' DatePicker*/}
+            <DatePicker
+              locale="ko"
+              selected={endDate}
+              onChange={(date: Date | null) => setEndDate(date)}
+              selectsEnd // 기간 선택의 '종료'임을 명시
+              startDate={startDate}
+              endDate={endDate}
+              isClearable={true}
+              placeholderText="종료일"
+              dateFormat="yyyy-MM-dd"
+              monthsShown={1} // 달력 1개만 표시
+              minDate={startDate || new Date()} // 시작일보다 빠를 수 없음
             />
             <SearchButton onClick={handleSearch}>검색</SearchButton>
           </SearchBar>

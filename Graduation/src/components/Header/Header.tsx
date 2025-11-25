@@ -1,9 +1,19 @@
 import styled from "@emotion/styled";
 import { Link } from "react-router-dom";
+
+console.log("VITE_KAKAO_REST_API_KEY:", import.meta.env.VITE_KAKAO_REST_API_KEY);
+console.log("VITE_KAKAO_REDIRECT_URI:", import.meta.env.VITE_KAKAO_REDIRECT_URI);
 // --- 카카오 로그인 설정 ---
 const KAKAO_REST_API_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY;
 const REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI; // 로컬용
 const KAKAO_AUTH_URL = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`;
+
+// --- Header가 받을 Props 타입 정의 ---
+interface HeaderProps {
+  isLoggedIn: boolean;
+  onLogoutClick: () => void;
+  // onLoginClick은 LoginModal을 안 쓰므로 제거
+}
 
 // --- 스타일 컴포넌트 ---
 
@@ -46,7 +56,6 @@ const Nav = styled.nav`
   }
 `;
 
-// (스타일 컴포넌트 정의는 동일합니다)
 const KakaoLoginButton = styled.button`
   padding: 0;
   border: none;
@@ -70,9 +79,35 @@ const KakaoLoginButton = styled.button`
   }
 `;
 
+// '마이페이지', '로그아웃' 버튼으로 재사용할 NavButton 스타일 정의
+const NavButton = styled('a')<{ primary?: boolean; as?: 'a' | 'button' | typeof Link }>`
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid ${({ theme, primary }) => (primary ? 'transparent' : theme.colors.border)};
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  background-color: ${({ theme, primary }) => (primary ? theme.colors.primary : theme.colors.white)};
+  color: ${({ theme, primary }) => (primary ? theme.colors.white : theme.colors.text)};
+  transition: all 0.2s ease-in-out;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+
+  @media (max-width: 768px) {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+`;
+
 
 // --- Header 컴포넌트 ---
-function Header() {
+function Header({ isLoggedIn, onLogoutClick }: HeaderProps) {
 
   // ✅ 1. 팝업창을 띄우는 함수를 정의합니다.
   const handleKakaoLogin = () => {
@@ -86,17 +121,31 @@ function Header() {
         <Logo>First Trip</Logo>
       </StyledLink>
 
+      {/*isLoggedIn 상태에 따라 다른 버튼들을 렌더링 */}
       <Nav>
-        {/* ✅ 2. NavButton 대신 KakaoLoginButton을 사용합니다. */}
-        <KakaoLoginButton onClick={handleKakaoLogin}>
-          {/* ✅ 3. public 폴더 안의 경로를 절대 경로로 적어줍니다.
-            /kakapo_login/kakao_login_large_narrow.png
-          */}
-          <img
-            src="/kakao_login/kakao_login_large_narrow.png"
-            alt="카카오로 로그인"
-          />
-        </KakaoLoginButton>
+        {isLoggedIn ? (
+          // --- 1. 로그인 되었을 때 ---
+          <>
+            {/* NavButton을 Link처럼 사용하기 위해 as={Link} 사용 */}
+            <NavButton as={Link} to="/mypage">
+              마이페이지
+            </NavButton>
+            <NavButton as="button" type="button" onClick={onLogoutClick} primary>
+              로그아웃
+            </NavButton>
+          </>
+        ) : (
+          // --- 2. 로그인 안 되었을 때 ---
+          <>
+            {/* 카카오 로그인 버튼 */}
+            <KakaoLoginButton onClick={handleKakaoLogin}>
+              <img
+                src="/kakao_login/kakao_login_large_narrow.png"
+                alt="카카오로 로그인"
+              />
+            </KakaoLoginButton>
+          </>
+        )}
       </Nav>
     </HeaderContainer>
   );

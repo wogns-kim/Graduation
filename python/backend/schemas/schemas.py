@@ -1,5 +1,3 @@
-# Pydantic을 사용하여 API의 요청(Request) 및 응답(Response) 데이터 형식을 정의하고 검증
-
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 
@@ -10,18 +8,18 @@ class UserSimple(BaseModel):
     profile_image_url: Optional[str] = None
 
     class Config:
-        from_attributes = True
+        from_attributes = True 
 
-# --- Kakao Login (users.py에서 사용) ---
+# --- Kakao Login ---
 class KakaoCode(BaseModel):
     code: str
 
-class Token(BaseModel): # JWT 토큰 응답용
+class Token(BaseModel):
     access_token: str
     token_type: str
-    next_action: Optional[str] = None # 로그인 후 다음 이동 경로
+    next_action: Optional[str] = None
 
-# --- Preferences (users.py에서 사용) ---
+# --- Preferences ---
 class UserPreferencesUpdate(BaseModel):
     preferences: List[str] = Field(..., description="사용자가 선택한 취향 해시태그 목록")
 
@@ -39,41 +37,61 @@ class Trip(BaseModel):
     shareable_link_id: str
 
     class Config:
-        from_attributes = True
+        from_attributes = True 
 
-# --- ItineraryItem ---
-class ItineraryItem(BaseModel):
-    item_id: int
+# --- Place ---
+class PlaceSchema(BaseModel):
+    place_id: int
     place_name: str
-    order_in_day: int
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    category: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+# --- ItineraryItem ---
+class ItineraryItemSimple(BaseModel):
+    item_id: int
+    place_id: int
+    place_name: str
+    order_in_day: int
+    
+    class Config:
+        from_attributes = True
+
+class ItemCreate(BaseModel):
+    place_id: int
+    visit_day_str: str 
+    order_in_day: int
+
+class ItemReorder(BaseModel):
+    visit_day_str: str
+    ordered_item_ids: List[int]
 
 # --- Trip Details ---
 class TripDetailsResponse(BaseModel):
     trip_name: str
     participants: List[UserSimple]
-    # 날짜별 구분을 포함한 복잡한 일정 구조
-    # 예: { "user_id_1": { "DAY 1": [...], "DAY 2": [...] } }
-    itineraries: Dict[str, Dict[str, List[ItineraryItem]]]
+    itineraries: Dict[str, Dict[str, List[ItineraryItemSimple]]]
 
-class PlaceSchema(BaseModel):
-    # Place ORM 모델의 place_name 필드를 Pydantic에서는 name으로 사용
-    name: str = Field(..., alias="place_name")
-    latitude: float
-    longitude: float
-
-    class Config:
-        # Pydantic이 ORM 객체에서 데이터를 읽어올 수 있도록 설정
-        orm_mode = True
-        from_attributes = True
-        
-# --- Recommendation (recommend.py에서 사용) ---
+# --- Recommendation ---
 class RecommendationResponse(BaseModel):
-    route: Dict[str, List[str]] # "DAY 1": ["장소1", "장소2"] ...
-    alternatives: Optional[List[str]] = None # "대안장소A", "대안장소B" ...
+    theme: Optional[str] = None 
+    route: Dict[str, List[str]]
+    alternatives: Optional[List[str]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True 
+
+# --- Trip History (Undo) ---
+class TripActionResponse(BaseModel):
+    action_id: int
+    action_type: str
+    created_at: object # datetime 객체 호환
+    user_name: str
+    description: Optional[str] = None
+
+    class Config:
         from_attributes = True

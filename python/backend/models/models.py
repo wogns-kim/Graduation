@@ -1,10 +1,10 @@
 # first_trip.sql에 정의된 테이블 구조를 파이썬 클래스 형태로 구현
 # SQLAlchemy(ORM)가 이 모델을 보고 DB와 통신
 
-from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint, BIGINT, DECIMAL, TEXT
+from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint, BIGINT, DECIMAL, TEXT, TIMESTAMP
 from sqlalchemy.orm import relationship
-from database.database import Base
 from sqlalchemy.sql import func
+from database.database import Base
 
 class User(Base):
     __tablename__ = "USERS"
@@ -39,6 +39,10 @@ class Place(Base):
     latitude = Column(DECIMAL(10, 7), nullable=True)
     longitude = Column(DECIMAL(10, 7), nullable=True)
     category = Column(String(255), nullable=True)
+    # 카테고리 테이블의 ID를 참조하는 외래 키
+    category_id = Column(Integer, ForeignKey("CATEGORIES.category_id"))
+    # Category 모델과 연결
+    category_rel = relationship("Category", back_populates="places")
 
 class ItineraryItem(Base):
     __tablename__ = "ITINERARY_ITEMS"
@@ -65,5 +69,6 @@ class TripAction(Base):
 class Category(Base):
     __tablename__ = "CATEGORIES"
     category_id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, nullable=False, index=True)
+    name = Column(String(255), unique=True, nullable=False)
+    # Place와의 관계 설정 (역참조)
     places = relationship("Place", back_populates="category_rel")
