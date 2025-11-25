@@ -17,7 +17,8 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("authToken"));
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("access_token"));
+  
   const handleLogout = () => {
     localStorage.removeItem("authToken"); // 토큰 삭제
     setIsLoggedIn(false); // 로그아웃 상태로 변경

@@ -2,11 +2,9 @@ declare global {
     interface Window {
         kakao: any;
     }
-
     interface ImportMetaEnv {
         readonly VITE_KAKAO_JAVASCRIPT_KEY: string;
     }
-
     interface ImportMeta {
         readonly env: ImportMetaEnv;
     }
@@ -14,283 +12,286 @@ declare global {
 
 export { };
 
+import React, { useState, useEffect, useRef } from "react";
+import { MapPin, Calendar, Info, Trash2, Map as MapIcon, Users, Plus, Minus, Edit2, Check, X } from "lucide-react";
 
-// 1. useEffect를 React에서 import 합니다.
-import React, { useState, useEffect } from "react";
-import { MapPin, Calendar, ChevronRight, Info, X } from "lucide-react";
+// ... (데이터 타입 정의는 동일) ...
+interface TripPoint { lat: number; lng: number; address: string; sourceId?: number; }
+interface TripFolder { id: number; title: string; participants: number; points: TripPoint[]; }
+interface Recommendation { id: number; title: string; description: string; lat: number; lng: number; }
 
 export default function TravelRoutePage() {
-    const [routes] = useState([
-        { id: 1, title: "경복궁", description: "조선시대의 아름다운 궁궐을 탐험하세요" },
-        { id: 2, title: "남산타워", description: "서울의 전경을 한눈에 볼 수 있는 랜드마크" },
-        { id: 3, title: "명동 거리", description: "쇼핑과 맛집이 가득한 번화가" },
-        { id: 4, title: "한강 공원", description: "자연과 함께하는 여유로운 시간" },
+    // ... (로직 부분은 기존과 100% 동일합니다) ...
+    const mapRef = useRef<any>(null);
+    const markersRef = useRef<any[]>([]); 
+    const polylineRef = useRef<any>(null);
+    const geocoderRef = useRef<any>(null);
+    const selectedIdRef = useRef<number | null>(null);
+    const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+    const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
+    const [editTitle, setEditTitle] = useState<string>("");
+
+    useEffect(() => { selectedIdRef.current = selectedFolderId; }, [selectedFolderId]);
+
+    const [travelFolders, setTravelFolders] = useState<TripFolder[]>([
+        { id: 1, title: "첫 번째 여행", participants: 4, points: [] },
+        { id: 2, title: "두 번째 여행", participants: 2, points: [] },
+        { id: 3, title: "세 번째 여행", participants: 6, points: [] },
     ]);
 
-    const [recommendations] = useState([
-        { id: 1, title: "북촌 한옥마을", description: "전통 가옥이 보존된 아름다운 마을" },
-        { id: 2, title: "인사동", description: "전통 문화와 예술이 살아있는 거리" },
-        { id: 3, title: "홍대 거리", description: "젊음과 예술이 넘치는 문화의 거리" },
-        { id: 4, title: "광장시장", description: "전통 먹거리의 천국" },
-        { id: 5, title: "동대문 디자인 플라자", description: "현대적 건축의 아름다움" },
-        { id: 6, title: "청계천", description: "도심 속 자연을 만나는 산책로" },
+    const [recommendations] = useState<Recommendation[]>([
+        { id: 101, title: "북촌 한옥마을", description: "전통 가옥이 보존된 마을", lat: 37.582604, lng: 126.983697 },
+        { id: 102, title: "인사동", description: "전통 문화의 거리", lat: 37.574388, lng: 126.989326 },
+        { id: 103, title: "홍대 거리", description: "젊음의 문화 거리", lat: 37.557527, lng: 126.924466 },
+        { id: 104, title: "광장시장", description: "먹거리의 천국", lat: 37.570151, lng: 126.999385 },
+        { id: 105, title: "남산타워", description: "서울의 랜드마크", lat: 37.551169, lng: 126.988227 },
+        { id: 106, title: "경복궁", description: "조선의 법궁", lat: 37.579617, lng: 126.977041 },
+        { id: 107, title: "충청남도 당진시 석문면", description: "서해안 드라이브 코스", lat: 37.003, lng: 126.532 },
+        { id: 108, title: "충청남도 아산시 송악면", description: "아름다운 자연 경관", lat: 36.733, lng: 127.033 },
     ]);
 
-    // 3. 맵을 로드하고 초기화하는 useEffect 훅
-    useEffect(() => {
-        // .env 파일에서 카카오 API 키 가져오기
-        const kakaoAppKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY;
-
-        if (!kakaoAppKey) {
-            console.error("❌ 카카오 지도 API 키를 찾을 수 없습니다!");
-            console.log("💡 .env 파일에 VITE_KAKAO_JAVASCRIPT_KEY=your_key 가 있는지 확인하세요");
-            console.log("💡 개발 서버를 재시작해주세요 (npm run dev)");
-            return;
+    const startEditing = (e: React.MouseEvent, folder: TripFolder) => {
+        e.stopPropagation();
+        setEditingFolderId(folder.id);
+        setEditTitle(folder.title);
+    };
+    const saveTitle = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (editTitle.trim() === "") return;
+        setTravelFolders(prev => prev.map(f => f.id === editingFolderId ? { ...f, title: editTitle } : f));
+        setEditingFolderId(null);
+    };
+    const cancelEditing = (e: React.MouseEvent) => { e.stopPropagation(); setEditingFolderId(null); };
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && editTitle.trim() !== "") {
+            setTravelFolders(prev => prev.map(f => f.id === editingFolderId ? { ...f, title: editTitle } : f));
+            setEditingFolderId(null);
         }
-        
-        console.log("✅ 카카오 API 키 로드 성공");
+    };
+    const addFolder = () => {
+        const nextId = travelFolders.length > 0 ? Math.max(...travelFolders.map(f => f.id)) + 1 : 1;
+        const newFolder: TripFolder = { id: nextId, title: `새로운 여행 ${nextId}`, participants: 1, points: [] };
+        setTravelFolders([...travelFolders, newFolder]);
+        setSelectedFolderId(nextId);
+    };
+    const handleMapClick = (lat: number, lng: number) => {
+        const currentId = selectedIdRef.current;
+        if (!currentId || !geocoderRef.current) return;
+        geocoderRef.current.coord2RegionCode(lng, lat, (result: any, status: any) => {
+            if (status === window.kakao.maps.services.Status.OK) {
+                const addressName = result[0].address_name;
+                const newPoint: TripPoint = { lat, lng, address: addressName };
+                setTravelFolders(prev => prev.map(folder => {
+                    if (folder.id === currentId) return { ...folder, points: [...folder.points, newPoint] };
+                    return folder;
+                }));
+            }
+        });
+    };
+    const toggleRecommendation = (rec: Recommendation) => {
+        if (!selectedFolderId) { alert("먼저 여행 폴더를 선택해주세요! 👆"); return; }
+        setTravelFolders(prev => prev.map(folder => {
+            if (folder.id === selectedFolderId) {
+                const exists = folder.points.some(p => p.sourceId === rec.id);
+                if (exists) return { ...folder, points: folder.points.filter(p => p.sourceId !== rec.id) };
+                else {
+                    const newPoint: TripPoint = { lat: rec.lat, lng: rec.lng, address: rec.title, sourceId: rec.id };
+                    return { ...folder, points: [...folder.points, newPoint] };
+                }
+            }
+            return folder;
+        }));
+    };
+    const deletePoint = (folderId: number, pointIndex: number) => {
+        setTravelFolders(prev => prev.map(folder => {
+            if (folder.id === folderId) {
+                const newPoints = folder.points.filter((_, index) => index !== pointIndex);
+                return { ...folder, points: newPoints };
+            }
+            return folder;
+        }));
+    };
+    const clearFolder = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        setTravelFolders(prev => prev.filter(f => f.id !== id));
+        if (selectedFolderId === id) setSelectedFolderId(null);
+    };
 
-        // 맵 초기화 함수
+    useEffect(() => {
+        if (!mapRef.current || !window.kakao) return;
+        markersRef.current.forEach(m => m.setMap(null));
+        markersRef.current = [];
+        if (polylineRef.current) polylineRef.current.setMap(null);
+        if (!selectedFolderId) return;
+        const currentFolder = travelFolders.find(f => f.id === selectedFolderId);
+        if (!currentFolder || currentFolder.points.length === 0) return;
+        const path: any[] = [];
+        currentFolder.points.forEach((point, index) => {
+            const position = new window.kakao.maps.LatLng(point.lat, point.lng);
+            path.push(position);
+            const content = `
+                <div style="position: relative; width: 0; height: 0;">
+                    <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 4px 10px; border-radius: 15px; border: 1px solid #667eea; font-size: 12px; font-weight: bold; color: #667eea; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); pointer-events: none;">${point.address}</div>
+                    <div style="position: absolute; top: 0; left: 0; transform: translate(-50%, -50%); width: 24px; height: 24px; background: #667eea; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${index + 1}</div>
+                </div>`;
+            const overlay = new window.kakao.maps.CustomOverlay({ position: position, content: content, map: mapRef.current });
+            markersRef.current.push(overlay);
+        });
+        if (path.length > 1) {
+            const polyline = new window.kakao.maps.Polyline({ path: path, strokeWeight: 5, strokeColor: '#667eea', strokeOpacity: 0.8, strokeStyle: 'solid' });
+            polyline.setMap(mapRef.current);
+            polylineRef.current = polyline;
+        }
+        const lastPoint = path[path.length - 1];
+        mapRef.current.panTo(lastPoint);
+    }, [travelFolders, selectedFolderId]); 
+
+    useEffect(() => {
+        const kakaoAppKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY;
+        if (!kakaoAppKey) return;
         const initializeMap = () => {
-            console.log("🗺️ 맵 초기화 시도...");
-            
             if (window.kakao && window.kakao.maps) {
-                console.log("✅ 카카오 맵 SDK 로드 완료");
-                
                 window.kakao.maps.load(() => {
-                    console.log("✅ 카카오 맵 로드 콜백 실행");
-                    
                     const mapContainer = document.getElementById('map');
-                    
-                    if (!mapContainer) {
-                        console.error("❌ 맵 컨테이너를 찾을 수 없습니다.");
-                        return;
-                    }
-                    
-                    console.log("✅ 맵 컨테이너 발견");
-
-                    try {
-                        const mapOption = {
-                            center: new window.kakao.maps.LatLng(37.566826, 126.9786567),
-                            level: 7,
-                        };
-
-                        const map = new window.kakao.maps.Map(mapContainer, mapOption);
-                        console.log("✅ 맵 생성 성공!");
-
-                        const markerPosition = new window.kakao.maps.LatLng(37.566826, 126.9786567);
-                        const marker = new window.kakao.maps.Marker({ position: markerPosition });
-                        marker.setMap(map);
-                        console.log("✅ 마커 추가 성공!");
-                    } catch (error) {
-                        console.error("❌ 맵 생성 중 오류:", error);
-                    }
+                    if (!mapContainer) return;
+                    const mapOption = { center: new window.kakao.maps.LatLng(37.566826, 126.9786567), level: 7 };
+                    const map = new window.kakao.maps.Map(mapContainer, mapOption);
+                    mapRef.current = map;
+                    geocoderRef.current = new window.kakao.maps.services.Geocoder();
+                    window.kakao.maps.event.addListener(map, 'click', function(mouseEvent: any) {
+                        handleMapClick(mouseEvent.latLng.getLat(), mouseEvent.latLng.getLng());
+                    });
                 });
-            } else {
-                console.error("❌ window.kakao.maps를 사용할 수 없습니다.");
             }
         };
-
-        // 스크립트 로드 로직
-        const existingScript = document.querySelector(
-            `script[src*="dapi.kakao.com/v2/maps/sdk.js"]`
-        );
-
+        const existingScript = document.querySelector(`script[src*="dapi.kakao.com/v2/maps/sdk.js"]`);
         if (existingScript) {
-            console.log("📌 기존 카카오맵 스크립트 발견");
-            
-            if (window.kakao && window.kakao.maps) {
-                console.log("✅ 카카오맵 이미 로드됨");
-                initializeMap();
-            } else {
-                console.log("⏳ 스크립트 로드 대기 중...");
-                existingScript.addEventListener("load", initializeMap);
-            }
+            if (window.kakao && window.kakao.maps) initializeMap();
+            else existingScript.addEventListener("load", initializeMap);
         } else {
-            console.log("📥 새 카카오맵 스크립트 추가 중...");
-            
             const script = document.createElement("script");
-            // 프로토콜 생략하면 현재 페이지 프로토콜을 따라감
-            script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&autoload=false`;
-            script.async = false; // 동기 로딩으로 변경
-            script.charset = "utf-8";
-            
-            script.onload = () => {
-                console.log("✅ 카카오맵 스크립트 로드 성공");
-                // 약간의 지연 후 초기화
-                setTimeout(() => {
-                    initializeMap();
-                }, 100);
-            };
-            
-            script.onerror = (error) => {
-                console.error("❌ 카카오맵 스크립트 로드 실패:", error);
-                console.log("💡 현재 API 키:", kakaoAppKey);
-                console.log("💡 카카오 개발자 콘솔 확인사항:");
-                console.log("   1. Web 플랫폼 등록: http://localhost:5173");
-                console.log("   2. JavaScript 키 활성화");
-                console.log("   3. 사이트 도메인이 정확한지 확인");
-            };
-            
+            script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&libraries=services&autoload=false`;
+            script.async = false;
+            script.onload = () => setTimeout(initializeMap, 100);
             document.head.appendChild(script);
         }
+    }, []); 
 
-        // cleanup
-        return () => {
-            console.log("🧹 맵 컴포넌트 언마운트");
-        };
-    }, []);
+    const currentActiveFolder = travelFolders.find(f => f.id === selectedFolderId);
 
     return (
-        <div style={styles.rootWrapper}>
+        <div className="root-wrapper">
+            {/* ★ 중요: 반응형 CSS를 위한 Style 태그 */}
             <style>{`
-                /* keyframes, hover 효과 등 스타일 정의 */
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(20px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                
-                .route-card:hover {
-                    transform: translateY(-5px);
-                    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
-                    border-color: #667eea;
-                }
-                
-                .rec-card:hover {
-                    transform: translateX(5px);
-                    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.15);
-                    border-color: #667eea;
-                }
-                
-                .edit-btn:hover {
-                    background: #667eea;
-                    color: white;
-                    transform: scale(1.05);
-                }
-                
-                .add-btn:hover {
-                    transform: scale(1.05);
-                    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-                }
-                
-                .close-btn:hover {
-                    background: #fee;
-                    color: #f56565;
-                }
-                
-                .next-btn:hover {
-                    transform: translateY(-5px);
-                    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+                /* 기본 스타일 */
+                * { box-sizing: border-box; }
+                ::-webkit-scrollbar { width: 6px; }
+                ::-webkit-scrollbar-track { background: transparent; }
+                ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+                ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+
+                /* 반응형 레이아웃 설정 */
+                .root-wrapper {
+                    height: 100vh; /* 기본은 꽉 찬 화면 */
+                    min-height: 800px; /* ★ 최소 높이 안전장치: 창이 너무 작으면 스크롤 생김 */
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                }
-                
-                .next-btn:hover svg {
-                    transform: translateX(5px);
-                }
-                
-                .rec-scroll::-webkit-scrollbar {
-                    width: 8px;
-                }
-                
-                .rec-scroll::-webkit-scrollbar-track {
-                    background: #f1f1f1;
-                    border-radius: 10px;
-                }
-                
-                .rec-scroll::-webkit-scrollbar-thumb {
-                    background: #667eea;
-                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden; /* 기본은 바깥 스크롤 숨김 */
                 }
 
-                @media (max-width: 1200px) {
-                    .three-column-grid {
-                        grid-template-columns: 1fr !important;
-                    }
+                .main-container {
+                    width: 100%;
+                    max-width: 1800px;
+                    margin: 0 auto;
+                    height: 100%;
+                    display: grid;
+                    grid-template-columns: 2fr 1fr 1fr; /* 가로 3단 */
+                    grid-template-rows: 7.5fr 2.5fr;    /* 세로 2단 (위 75%, 아래 25%) */
+                    gap: 15px;
                 }
+
+                /* PC 화면용 배치 */
+                .map-card { grid-column: 1 / 2; grid-row: 1 / 2; }
+                .detail-card { grid-column: 1 / 2; grid-row: 2 / 3; }
+                .middle-section { grid-column: 2 / 3; grid-row: 1 / 2; height: 100%; } /* 지도 높이와 동일하게 */
+                .right-section { grid-column: 3 / 4; grid-row: 1 / 2; height: 100%; }  /* 지도 높이와 동일하게 */
+
+                /* ★ 태블릿/모바일 화면 (1200px 이하) 대응 */
+                @media (max-width: 1200px) {
+                    .root-wrapper {
+                        height: auto; /* 높이 제한 해제 */
+                        overflow-y: auto; /* 세로 스크롤 허용 */
+                    }
+                    .main-container {
+                        display: flex;
+                        flex-direction: column; /* 세로로 쌓기 */
+                        height: auto;
+                    }
+                    
+                    /* 세로 모드일 때 각 섹션의 높이 지정 */
+                    .map-card { height: 500px; flex: none; }
+                    .detail-card { height: 300px; flex: none; }
+                    .middle-section { height: 400px; flex: none; }
+                    .right-section { height: 400px; flex: none; }
+                }
+
+                /* 공통 컴포넌트 스타일 */
+                .white-box {
+                    background: white;
+                    border-radius: 15px;
+                    padding: 15px;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+
+                .folder-card:hover { transform: translateY(-2px); box-shadow: 0 3px 10px rgba(102, 126, 234, 0.1); }
+                .rec-card:hover { transform: translateX(3px); border-color: #667eea; }
+                
+                .point-delete-btn { padding: 6px; background: transparent; border: none; border-radius: 4px; color: #cbd5e0; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+                .point-delete-btn:hover { color: #e53e3e; background: #fee; }
+                
+                .edit-icon-btn { opacity: 0; padding: 4px; border-radius: 4px; color: #a0aec0; cursor: pointer; transition: all 0.2s; }
+                .folder-card:hover .edit-icon-btn { opacity: 1; }
+                .edit-icon-btn:hover { background: #edf2f7; color: #667eea; }
             `}</style>
 
-            <div style={styles.container}>
-                <div className="three-column-grid" style={styles.threeColumnGrid}>
-                    {/* 왼쪽: 혼자 여행 서울 + 프로필 */}
-                    <div style={styles.leftColumn}>
-                        <div style={styles.tripDetailsCard}>
-                            <div style={styles.tripBadge}>혼자 여행</div>
+            <div className="main-container">
+                
+                {/* [1] 지도 카드 */}
+                <div className="white-box map-card">
+                    <div style={styles.cardHeader}>
+                        {!selectedFolderId ? (
                             <div style={styles.tripLocation}>
-                                <MapPin size={24} color="#667eea" />
-                                <span>서울</span>
+                                <MapIcon size={24} color="#718096" />
+                                <span style={{color: '#718096'}}>전체 지도</span>
                             </div>
-                            <div id="map" style={styles.tripImage}></div>
-                        </div>
-
-                        <div style={styles.profileSection}>
-                            <div style={styles.avatarGroup}>
-                                <div style={styles.avatarItem}>
-                                    <div style={styles.avatar}>
-                                        <span style={styles.avatarText}>햄</span>
+                        ) : (
+                            <>
+                                <div style={styles.tripBadge}>편집 중</div>
+                                <div style={styles.headerRow}>
+                                    <div style={styles.tripLocation}>
+                                        <MapIcon size={24} color="#667eea" />
+                                        <span style={{fontSize:'20px'}}>{currentActiveFolder?.title}</span>
                                     </div>
-                                    <span style={styles.avatarName}>햄스갱</span>
-                                </div>
-                                <div style={styles.avatarItem}>
-                                    <div style={styles.avatar}>
-                                        <span style={styles.avatarText}>무</span>
+                                    <div style={styles.participantBadge}>
+                                        <Users size={16} />
+                                        <span>{currentActiveFolder?.participants}명</span>
                                     </div>
-                                    <span style={styles.avatarName}>무적언</span>
                                 </div>
-                            </div>
-                        </div>
+                            </>
+                        )}
                     </div>
-
-                    {/* 가운데: 여행 루트 */}
-                    <div style={styles.section}>
-                        <div style={styles.sectionHeader}>
-                            <h2 style={styles.sectionTitle}>
-                                <Calendar size={28} color="#667eea" />
-                                여행 루트
-                            </h2>
-                        </div>
-                        <div style={styles.routeCards}>
-                            {routes.map((route, index) => (
-                                <div key={route.id} className="route-card" style={styles.routeCard}>
-                                    <div style={styles.routeNumber}>{index + 1}</div>
-                                    <div style={styles.routeContent}>
-                                        <h3 style={styles.routeTitle}>{route.title}</h3>
-                                        <p style={styles.routeDescription}>{route.description}</p>
-                                    </div>
-                                    <button className="edit-btn" style={styles.editButton}>
-                                        <span>수정</span>
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* 오른쪽: 추천 여행지 */}
-                    <div style={styles.section}>
-                        <div style={styles.sectionHeader}>
-                            <h2 style={styles.sectionTitle}>
-                                <MapPin size={28} color="#667eea" />
-                                추천 여행지
-                            </h2>
-                        </div>
-                        <div className="rec-scroll" style={styles.recommendationCards}>
-                            {recommendations.map((rec) => (
-                                <div key={rec.id} className="rec-card" style={styles.recommendationCard}>
-                                    <div style={styles.recInfo}>
-                                        <Info size={18} color="#667eea" />
-                                    </div>
-                                    <div style={styles.recContent}>
-                                        <h4 style={styles.recTitle}>{rec.title}</h4>
-                                        <p style={styles.recDescription}>{rec.description}</p>
-                                    </div>
-                                    <div style={styles.recActions}>
-                                        <button className="add-btn" style={styles.addButton}>담기</button>
-                                        <button className="close-btn" style={styles.closeButton}>
-                                            <X size={20} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                    
+                    <div style={styles.mapContainer}>
+                        <div id="map" style={{width: '100%', height: '100%'}}></div>
+                        <div style={styles.mapOverlayHint}>
+                            {!selectedFolderId 
+                                ? "오른쪽에서 여행 폴더를 선택하세요 👉" 
+                                : "지도를 클릭해 경로를 추가하세요 📍"}
                         </div>
                     </div>
                 </div>
@@ -302,251 +303,223 @@ export default function TravelRoutePage() {
                         <ChevronRight size={24} style={{ transition: 'transform 0.3s ease' }} />
                     </button>
                 </div> */}
+                {/* [2] 상세 경로 리스트 */}
+                <div className="white-box detail-card">
+                    <h4 style={styles.detailTitle}>
+                        {selectedFolderId ? `📂 ${currentActiveFolder?.title} 경로` : "📂 선택된 여행 없음"}
+                    </h4>
+                    <div style={styles.scrollableList}>
+                        {!selectedFolderId ? (
+                            <div style={styles.emptyState}>여행 폴더를 선택하면<br/>여기에 경로가 표시됩니다.</div>
+                        ) : currentActiveFolder?.points.length === 0 ? (
+                            <div style={styles.emptyState}>
+                                아직 추가된 장소가 없습니다.<br/>
+                                지도를 클릭하거나 추천 여행지를 담아보세요!
+                            </div>
+                        ) : (
+                            currentActiveFolder?.points.map((point, idx) => (
+                                <div key={idx} style={styles.detailItem}>
+                                    <div style={styles.detailIndex}>{idx + 1}</div>
+                                    <div style={{...styles.detailAddress, flex: 1}}>{point.address}</div>
+                                    <button
+                                        className="point-delete-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (selectedFolderId) {
+                                                deletePoint(selectedFolderId, idx);
+                                            }
+                                        }}
+                                        title="삭제"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* [3] 가운데: 폴더 리스트 */}
+                <div className="white-box middle-section">
+                    <div style={styles.sectionHeader}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px'}}>
+                            <h2 style={styles.sectionTitle}>
+                                <Calendar size={24} color="#667eea" />
+                                나의 여행 폴더
+                            </h2>
+                            <button onClick={addFolder} style={styles.addTripButton}>
+                                <Plus size={16} />
+                                <span>여행 추가</span>
+                            </button>
+                        </div>
+                        <p style={{color: '#718096', fontSize: '12px', margin: 0}}>
+                            여행을 선택하여 경로를 계획하세요.
+                        </p>
+                    </div>
+                    <div style={styles.scrollableList}>
+                        {travelFolders.map((folder) => {
+                            const isSelected = selectedFolderId === folder.id;
+                            const isEditing = editingFolderId === folder.id;
+                            const pointCount = folder.points.length;
+
+                            return (
+                                <div 
+                                    key={folder.id} 
+                                    className="folder-card" 
+                                    onClick={() => !isEditing && setSelectedFolderId(folder.id)}
+                                    style={{
+                                        ...styles.folderCard,
+                                        borderColor: isSelected ? '#667eea' : '#e2e8f0',
+                                        background: isSelected ? '#eff6ff' : 'white',
+                                        borderWidth: isSelected ? '2px' : '1px',
+                                    }}
+                                >
+                                    <div style={{
+                                        ...styles.folderIconBox,
+                                        background: isSelected ? '#667eea' : '#cbd5e0'
+                                    }}>
+                                        <span style={{color: 'white', fontWeight: 'bold'}}>{folder.id}</span>
+                                    </div>
+                                    
+                                    <div style={{flex: 1}}>
+                                        {isEditing ? (
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px'}}>
+                                                <input 
+                                                    type="text" 
+                                                    value={editTitle}
+                                                    onChange={(e) => setEditTitle(e.target.value)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    onKeyDown={handleKeyDown}
+                                                    autoFocus
+                                                    style={styles.editInput}
+                                                />
+                                                <button onClick={saveTitle} style={styles.saveBtn}><Check size={14} /></button>
+                                                <button onClick={cancelEditing} style={styles.cancelBtn}><X size={14} /></button>
+                                            </div>
+                                        ) : (
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                                <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                                    <h3 style={styles.folderTitle}>{folder.title}</h3>
+                                                    <div className="edit-icon-btn" onClick={(e) => startEditing(e, folder)}>
+                                                        <Edit2 size={12} />
+                                                    </div>
+                                                </div>
+                                                {isSelected && !isEditing && <span style={styles.activeBadge}>선택됨</span>}
+                                            </div>
+                                        )}
+                                        
+                                        <div style={styles.folderDesc}>
+                                            <span>{pointCount === 0 ? "경로 없음" : `${pointCount}개 장소`}</span>
+                                            <span style={{margin: '0 5px', color: '#cbd5e0'}}>|</span>
+                                            <div style={{display: 'flex', alignItems: 'center'}}>
+                                                <Users size={11} style={{marginRight: '3px', marginBottom: '-1px'}}/>
+                                                <span>{folder.participants}명</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {!isEditing && (
+                                        <button 
+                                            className="clear-btn"
+                                            onClick={(e) => clearFolder(e, folder.id)}
+                                            style={styles.clearButton}
+                                            title="폴더 삭제"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* [4] 오른쪽: 추천 여행지 */}
+                <div className="white-box right-section">
+                    <div style={styles.sectionHeader}>
+                        <h2 style={styles.sectionTitle}>
+                            <MapPin size={24} color="#667eea" />
+                            추천 여행지
+                        </h2>
+                    </div>
+                    <div style={styles.scrollableList}>
+                        {recommendations.map((rec) => {
+                            const isAdded = currentActiveFolder?.points.some(p => p.sourceId === rec.id);
+
+                            return (
+                                <div key={rec.id} className="rec-card" style={styles.recommendationCard}>
+                                    <div style={styles.recInfo}><Info size={16} color="#667eea" /></div>
+                                    <div style={styles.recContent}>
+                                        <h4 style={styles.recTitle}>{rec.title}</h4>
+                                        <p style={styles.recDescription}>{rec.description}</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => toggleRecommendation(rec)}
+                                        style={{
+                                            ...styles.actionButton,
+                                            background: isAdded ? '#fff5f5' : '#f3f0ff',
+                                            color: isAdded ? '#e53e3e' : '#667eea',
+                                            border: isAdded ? '1px solid #feb2b2' : '1px solid #d6bcfa'
+                                        }}
+                                    >
+                                        {isAdded ? <Minus size={12} /> : <Plus size={12} />}
+                                        <span style={{marginLeft: '4px'}}>{isAdded ? '빼기' : '담기'}</span>
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         </div>
     );
 }
 
-// ✅ 디자인 수정 절대 없음
+// 인라인 스타일은 컴포넌트 내부에서 처리하기 힘든 동적이지 않은 부분만 남김
 const styles = {
-    rootWrapper: {
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '20px',
-    },
-    container: {
-        maxWidth: '1600px',
-        margin: '0 auto',
-    },
-    threeColumnGrid: {
-        display: 'grid',
-        gridTemplateColumns: '770px 1fr 370px',
-        gap: '30px',
-        marginBottom: '40px',
-    },
-    leftColumn: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-    },
-    tripDetailsCard: {
-        background: 'white',
-        borderRadius: '20px',
-        padding: '30px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-    },
-    tripBadge: {
-        display: 'inline-block',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white',
-        padding: '8px 20px',
-        borderRadius: '20px',
-        fontWeight: '600',
-        fontSize: '16px',
-        marginBottom: '15px',
-    },
-    tripLocation: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        fontSize: '28px',
-        fontWeight: '700',
-        color: '#2d3748',
-        marginBottom: '20px',
-    },
-    tripImage: {
+    mapContainer: {
+        flex: 1,
         width: '100%',
-        height: '500px',
-        borderRadius: '15px',
-        boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
-        overflow: 'hidden',
-    },
-    profileSection: {
-        background: 'white',
-        borderRadius: '20px',
-        padding: '20px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-    },
-    avatarGroup: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '15px',
-    },
-    avatarItem: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-    },
-    avatar: {
-        width: '45px',
-        height: '45px',
-        borderRadius: '50%',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
-    },
-    avatarText: {
-        color: 'white',
-        fontSize: '18px',
-        fontWeight: '700',
-    },
-    avatarName: {
-        fontSize: '16px',
-        fontWeight: '600',
-        color: '#2d3748',
-    },
-    section: {
-        background: 'white',
-        borderRadius: '20px',
-        padding: '30px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-    },
-    sectionHeader: {
-        marginBottom: '25px',
-    },
-    sectionTitle: {
-        fontSize: '28px',
-        fontWeight: '700',
-        color: '#2d3748',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        margin: 0,
-    },
-    routeCards: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-    },
-    routeCard: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '20px',
-        padding: '25px',
-        border: '2px solid #e2e8f0',
-        borderRadius: '15px',
-        background: 'linear-gradient(to right, #f7fafc, white)',
-        transition: 'all 0.3s ease',
-    },
-    routeNumber: {
-        width: '50px',
-        height: '50px',
-        borderRadius: '50%',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '24px',
-        fontWeight: '700',
-        flexShrink: 0,
-    },
-    routeContent: { flex: 1 },
-    routeTitle: {
-        fontSize: '22px',
-        fontWeight: '700',
-        color: '#2d3748',
-        marginBottom: '5px',
-        margin: '0 0 5px 0',
-    },
-    routeDescription: {
-        fontSize: '16px',
-        color: '#718096',
-        lineHeight: '1.5',
-        margin: 0,
-    },
-    editButton: {
-        padding: '10px 25px',
-        background: 'white',
-        border: '2px solid #667eea',
+        position: 'relative' as const,
         borderRadius: '10px',
-        color: '#667eea',
-        fontWeight: '600',
-        fontSize: '16px',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
+        overflow: 'hidden',
+        border: '1px solid #e2e8f0'
     },
-    recommendationCards: {
+    scrollableList: {
+        flex: 1,
+        overflowY: 'auto' as const,
+        paddingRight: '5px',
         display: 'flex',
-        flexDirection: 'column',
-        gap: '15px',
-        maxHeight: '700px',
-        overflowY: 'auto',
-        paddingRight: '10px',
+        flexDirection: 'column' as const,
+        gap: '8px' 
     },
-    recommendationCard: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '15px',
-        padding: '18px',
-        border: '2px solid #e2e8f0',
-        borderRadius: '12px',
-        background: 'white',
-        transition: 'all 0.3s ease',
-    },
-    recInfo: { color: '#667eea', flexShrink: 0 },
+    cardHeader: { marginBottom: '10px' },
+    tripBadge: { display: 'inline-block', background: '#667eea', color: 'white', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', marginBottom: '5px' },
+    headerRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+    tripLocation: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '20px', fontWeight: '700', color: '#2d3748' },
+    participantBadge: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: '#4a5568', background: '#f7fafc', padding: '4px 10px', borderRadius: '15px' },
+    mapOverlayHint: { position: 'absolute' as const, bottom: '20px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 20px', borderRadius: '20px', fontSize: '14px', zIndex: 10, whiteSpace: 'nowrap' as const },
+    detailTitle: { margin: '0 0 8px 0', color: '#2d3748', fontSize: '15px', borderBottom: '2px solid #f7fafc', paddingBottom: '6px' },
+    detailItem: { display: 'flex', alignItems: 'center', gap: '10px', background: '#f7fafc', padding: '8px', borderRadius: '8px', fontSize: '13px' },
+    detailIndex: { width: '20px', height: '20px', background: '#667eea', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 },
+    detailAddress: { fontSize: '13px', color: '#4a5568' },
+    emptyState: { textAlign: 'center' as const, color: '#a0aec0', marginTop: '10px', fontSize: '13px', lineHeight: '1.6' },
+    sectionHeader: { marginBottom: '15px', borderBottom: '1px solid #edf2f7', paddingBottom: '10px' },
+    sectionTitle: { fontSize: '18px', fontWeight: '700', color: '#2d3748', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 },
+    addTripButton: { display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', background: '#667eea', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' },
+    folderCard: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '10px', transition: 'all 0.2s ease', cursor: 'pointer', minHeight: 'auto' },
+    folderIconBox: { width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 },
+    folderTitle: { fontSize: '14px', fontWeight: '700', color: '#2d3748', margin: '0 0 2px 0' },
+    folderDesc: { fontSize: '11px', color: '#718096', margin: 0, display: 'flex', alignItems: 'center' },
+    activeBadge: { fontSize: '10px', color: '#667eea', background: '#eff6ff', padding: '2px 6px', borderRadius: '6px', fontWeight: '600' },
+    clearButton: { padding: '6px', background: '#f7fafc', border: 'none', borderRadius: '6px', color: '#a0aec0', cursor: 'pointer', transition: 'all 0.2s' },
+    editInput: { flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #667eea', fontSize: '14px', outline: 'none' },
+    saveBtn: { background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '4px', cursor: 'pointer', marginLeft: '4px' },
+    cancelBtn: { background: '#e2e8f0', color: '#4a5568', border: 'none', borderRadius: '4px', padding: '4px', cursor: 'pointer', marginLeft: '4px' },
+    recommendationCard: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '10px', minHeight: 'auto', background: 'white' },
+    recInfo: { color: '#667eea' },
     recContent: { flex: 1 },
-    recTitle: {
-        fontSize: '16px',
-        fontWeight: '600',
-        color: '#2d3748',
-        marginBottom: '3px',
-        margin: '0 0 3px 0',
-    },
-    recDescription: {
-        fontSize: '14px',
-        color: '#718096',
-        margin: 0,
-    },
-    recActions: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-    },
-    addButton: {
-        padding: '8px 18px',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        border: 'none',
-        borderRadius: '8px',
-        color: 'white',
-        fontWeight: '600',
-        fontSize: '14px',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-    },
-    closeButton: {
-        width: '32px',
-        height: '32px',
-        borderRadius: '50%',
-        border: 'none',
-        background: '#f7fafc',
-        color: '#718096',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-    },
-    nextButtonWrapper: {
-        display: 'flex',
-        justifyContent: 'center',
-        padding: '20px 0',
-    },
-    nextButton: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '15px',
-        padding: '20px 50px',
-        background: 'white',
-        border: 'none',
-        borderRadius: '15px',
-        fontSize: '20px',
-        fontWeight: '700',
-        color: '#667eea',
-        cursor: 'pointer',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-        transition: 'all 0.3s ease',
-    },
+    recTitle: { fontSize: '14px', fontWeight: '600', margin: '0 0 2px 0' },
+    recDescription: { fontSize: '11px', color: '#718096', margin: 0 },
+    actionButton: { display: 'flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' as const },
 } as const;

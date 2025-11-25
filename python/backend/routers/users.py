@@ -177,8 +177,18 @@ def get_user_preferences(
         return {"preferences": prefs_list}
     else:
         return {"preferences": None}
+    
 
-# --- 4. 테스트용 임시 토큰 발급 API ---
+# --- 4. 내 프로필 정보 조회 API ---
+@router.get("/me", response_model=schemas.UserSimple)
+def get_my_profile(current_user: models.User = Depends(get_current_user)):
+    """
+    현재 로그인한 사용자의 기본 프로필 정보(이름, 프사 등)를 반환합니다.
+    """
+    return current_user
+
+
+# --- 5. 테스트용 임시 토큰 발급 API ---
 @router.get("/test-token/{user_id}", tags=["Test"], response_model=schemas.Token)
 def get_test_token(user_id: int):
     """
