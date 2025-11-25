@@ -6,6 +6,7 @@ class UserSimple(BaseModel):
     user_id: int
     username: str
     profile_image_url: Optional[str] = None
+    preferences: Optional[str] = None # DB의 preferences 컬럼(문자열)을 담을 공간
 
     class Config:
         from_attributes = True 
