@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import styled from "@emotion/styled";
 import { useNavigate } from "react-router-dom";
 
@@ -37,10 +37,6 @@ interface KeywordButtonProps {
     isSelected: boolean;
 }
 
-interface NavButtonProps {
-    primary?: boolean;
-}
-
 export default function Taste() {
     const [selectedKeywords, setSelectedKeywords] = useState(new Set<string>());
     const navigate = useNavigate();
@@ -57,12 +53,9 @@ export default function Taste() {
         });
     };
 
-    // 저장 버튼 클릭 시 실행될 함수를 만듭니다.
+    // 저장 버튼 클릭 시 실행될 함수
     const handleSave = () => {
-        // (선택 사항) 선택된 취향을 localStorage나 백엔드에 저장할 수 있습니다.
         console.log("선택된 취향:", Array.from(selectedKeywords));
-        
-        // HomePage('/')로 이동합니다.
         navigate('/');
     };
 
@@ -78,40 +71,55 @@ export default function Taste() {
                 </Header>
 
                 <MainGrid>
-                    {categories.map((category) => (
-                        <CategoryColumn key={category.title}>
-                            <CategoryHeader>
-                                <span role="img" aria-label={category.title}>
-                                    {category.icon}
-                                </span>
-                                <CategoryTitle>{category.title}</CategoryTitle>
-                            </CategoryHeader>
-                            <Line />
+                    {categories.map((category) => {
+                        // 공통 카드 내용
+                        const CardContent = (
+                            <CategoryColumn>
+                                <CategoryHeader>
+                                    <span role="img" aria-label={category.title}>
+                                        {category.icon}
+                                    </span>
+                                    <CategoryTitle>{category.title}</CategoryTitle>
+                                </CategoryHeader>
+                                <Line />
+                                <ButtonGrid>
+                                    {category.keywords.map((keyword) => (
+                                        <KeywordButton
+                                            key={keyword}
+                                            isSelected={selectedKeywords.has(keyword)}
+                                            onClick={() => toggleKeyword(keyword)}
+                                        >
+                                            {keyword}
+                                        </KeywordButton>
+                                    ))}
+                                </ButtonGrid>
+                            </CategoryColumn>
+                        );
 
-                            <ButtonGrid>
-                                {category.keywords.map((keyword) => (
-                                    <KeywordButton
-                                        key={keyword}
-                                        isSelected={selectedKeywords.has(keyword)}
-                                        onClick={() => toggleKeyword(keyword)}
-                                    >
-                                        {keyword}
-                                    </KeywordButton>
-                                ))}
-                            </ButtonGrid>
-                        </CategoryColumn>
-                    ))}
+                        // '동행 유형'인 경우에만 위에 저장 버튼 추가
+                        if (category.title === "동행 유형") {
+                            return (
+                                <CategoryWrapper key={category.title}>
+                                    <SaveButton onClick={handleSave}>저장</SaveButton>
+                                    {CardContent}
+                                </CategoryWrapper>
+                            );
+                        }
+
+                        // 나머지 카테고리
+                        return (
+                            <CategoryWrapper key={category.title}>
+                                {CardContent}
+                            </CategoryWrapper>
+                        );
+                    })}
                 </MainGrid>
-
-                <NavContainer>
-                    <NavButton primary onClick={handleSave}>저장</NavButton>
-                </NavContainer>
             </Container>
         </PageWrapper>
     );
 }
 
-// --- 페이지 전체 래퍼 (추가) ---
+// --- 스타일 컴포넌트 ---
 const PageWrapper = styled.div`
   min-height: 100vh;
   width: 100%;
@@ -119,11 +127,10 @@ const PageWrapper = styled.div`
   overflow-x: hidden;
 `;
 
-// --- 전체 레이아웃 ---
 const Container = styled.div`
   min-height: 100vh;
   background-color: white;
-  padding: 1rem 2rem 2rem 2rem;;
+  padding: 1rem 2rem 2rem 2rem;
   max-width: 1400px;
   margin: 0 auto;
   display: flex;
@@ -132,13 +139,14 @@ const Container = styled.div`
 
 const Header = styled.header`
   text-align: center;
+  margin-bottom: 4rem; /* 버튼 공간 확보를 위해 여백 유지 */
 
   h1 {
     color: rgb(33, 33, 33);
     font-size: 2.5rem;
     font-weight: 400;
     text-shadow: 4px 4px 4px rgba(0, 0, 0, 0.1);
-    margin-bottom: 0.1rem;
+    margin-bottom: 0.5rem;
   }
 
   p {
@@ -149,27 +157,28 @@ const Header = styled.header`
   }
 `;
 
-// --- 반응형 메인 그리드 ---
 const MainGrid = styled.main`
   display: grid;
   flex: 1;
-
-  /* 데스크톱 (기본 3단) */
+  align-items: stretch; /* 높이를 꽉 채우도록 설정 */
   grid-template-columns: 1fr 1fr 1fr;
   gap: 2.5rem;
 
-  /* 태블릿 (900px 이하 2단) */
   @media (max-width: 900px) {
     grid-template-columns: 1fr 1fr;
   }
-
-  /* 모바일 (600px 이하 1단) */
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
   }
 `;
 
-// --- 카테고리 카드 ---
+const CategoryWrapper = styled.div`
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+`;
+
 const CategoryColumn = styled.div`
   display: flex;
   flex-direction: column;
@@ -178,6 +187,8 @@ const CategoryColumn = styled.div`
   padding: 1.5rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   border: 1px solid #eee;
+  flex: 1;
+  height: 100%;
 `;
 
 const CategoryHeader = styled.div`
@@ -205,7 +216,6 @@ const Line = styled.div`
   margin-bottom: 1.5rem;
 `;
 
-// --- 키워드 버튼 ---
 const ButtonGrid = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -234,26 +244,37 @@ const KeywordButton = styled.button<KeywordButtonProps>`
   }
 `;
 
-// --- 하단 네비게이션 ---
-const NavContainer = styled.nav`
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 2rem;
-  margin-top: 2rem;
-  border-top: 1px solid #eee;
-`;
-
-const NavButton = styled.button<NavButtonProps>`
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-family: Inter, sans-serif;
-  font-weight: 400;
-  box-shadow: 2px 5px 8px 3px rgba(0, 0, 0, 0.2);
-  border: solid 2px black;
+// 👇 깔끔하게 변경된 저장 버튼 스타일
+const SaveButton = styled.button`
+  position: absolute;
+  top: -4rem; 
+  right: 0;
+  
+  /* 디자인 변경: 심플하고 모던하게 */
+  background-color: #3C73EC; /* 테마의 Primary Color (파란색) */
+  color: white;
+  border: none;
   border-radius: 8px;
-  width: 120px;
+  padding: 10px 24px;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 4px 6px rgba(60, 115, 236, 0.2); /* 부드러운 파란 그림자 */
+  transition: all 0.2s ease;
 
-  background-color: ${(props) =>
-      props.primary ? "rgb(243, 252, 255)" : "rgba(243, 252, 255, 0.5)"};
+  &:hover {
+    background-color: #2a5bbf; /* 호버 시 약간 진하게 */
+    transform: translateY(-2px); /* 살짝 떠오르는 효과 */
+    box-shadow: 0 6px 12px rgba(60, 115, 236, 0.3);
+  }
+
+  &:active {
+    transform: translateY(0); /* 클릭 시 눌리는 효과 */
+  }
+
+  @media (max-width: 900px) {
+    position: static;
+    margin-bottom: 1rem;
+    align-self: flex-end;
+  }
 `;

@@ -74,11 +74,9 @@ const MyPage = () => {
   // const [selectedStyle, setSelectedStyle] = useState('전체'); // 사용하지 않으므로 제거 가능
 
   // 2. 로그아웃
-  const handleLogout = () => {
-    if (window.confirm("로그아웃 하시겠습니까?")) {
-        localStorage.removeItem("access_token");
-        navigate('/');
-    }
+  const handleEdit = () => {
+    // 취향 선택 페이지로 이동
+    navigate('/taste');
   };
 
   // 3. 백엔드 데이터 가져오기
@@ -169,7 +167,7 @@ const MyPage = () => {
         <ContentWrap>
           <PageHeader>
             <Title>마이페이지</Title>
-            <LogoutButton onClick={handleLogout}>로그아웃</LogoutButton>
+            <LogoutButton onClick={handleEdit}>수정</LogoutButton>
           </PageHeader>
 
           {/* 프로필 정보 컴포넌트 */}

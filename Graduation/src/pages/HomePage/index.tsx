@@ -1,35 +1,21 @@
-// src/pages/HomePage/index.tsx
-
 import { useState } from "react";
 import styled from "@emotion/styled";
-import { Link } from "react-router-dom"; // <-- 1. react-router-dom의 Link를 가져옵니다.
+import { Link, useNavigate } from "react-router-dom"; // useNavigate 추가
 
-// 달력 UI 변경
+// 달력 UI
 import DatePicker, { registerLocale } from "react-datepicker";
 import { ko } from "date-fns/locale/ko";
 import "react-datepicker/dist/react-datepicker.css";
 
-// 달력 한글
+// 달력 한글 설정
 registerLocale('ko', ko);
 
 // 컴포넌트 및 데이터 불러오기
-
 import CityCard from "../../components/CityCard/CityCard";
 import { cityData } from "../../data/cityData";
 
-// --- 페이지 레이아웃을 위한 스타일 컴포넌트 ---
-
-const seoulDistricts = [
-  { id: 'seoul-1', name: '은평구' },
-  { id: 'seoul-2', name: '동작구' },
-  { id: 'seoul-3', name: '서초구' },
-  { id: 'seoul-4', name: '용산구' },
-];
-
-interface RecommendationItem {
-  id: number | string; // cityData는 number, seoulDistricts는 string
-  name: string;
-}
+// --- 스타일 컴포넌트 (기존과 동일) ---
+// (기존 스타일 코드는 그대로 두시면 됩니다. 여기서는 생략하지 않고 전체 구조를 보여드릴게요)
 
 const PageWrapper = styled.div`
   min-height: 100vh;
@@ -38,7 +24,6 @@ const PageWrapper = styled.div`
 
 const MainContent = styled.main``;
 
-// ... (HeroSection, SearchBar 등 다른 스타일 컴포넌트는 그대로)
 const HeroSection = styled.section`
   background: linear-gradient(to right, #6a82fb, #fc5c7d);
   display: flex;
@@ -48,7 +33,7 @@ const HeroSection = styled.section`
 `;
 
 const SearchContainer = styled.div`
-  position: relative; /* 추천 목록의 위치 기준이 됨 */
+  position: relative;
   flex: 1;
   min-width: 180px;
 `;
@@ -68,14 +53,13 @@ const SearchBar = styled.div`
     align-items: stretch;
   }
   
-  /* ... (내부 DatePicker 스타일은 그대로) ... */
   .react-datepicker-wrapper {
     flex: 1;
-    mid-width: 180px;
+    min-width: 180px; /* 오타 수정: mid-width -> min-width */
   }
   .react-datepicker__input-container input {
     width: 100%;
-    box-sizing: border-box; /* 패딩과 테두리를 너비에 포함 */
+    box-sizing: border-box;
     padding: 12px 16px;
     font-size: 16px;
     border: 1px solid ${({ theme }) => theme.colors.border};
@@ -89,10 +73,9 @@ const SearchBar = styled.div`
   }
 
   .react-datepicker-popper {
-    z-index: 2;
+    z-index: 100; /* z-index 높임 (추천 목록보다 높게) */
   }
 
-  /* 달력 전체 컨테이너 */
   .react-datepicker {
     font-size: 1rem;
     border: 1px solid #e0e0e0;
@@ -100,25 +83,21 @@ const SearchBar = styled.div`
     background-color: white;
   }
 
-  /* 헤더 (회색 배경 -> 흰색, 경계선 추가) */
   .react-datepicker__header {
     background-color: white;
     border-bottom: 1px solid #eee;
     padding: 10px 0 8px 0;
   }
 
-  /* 월 표시 (예: 2025년 10월) */
   .react-datepicker__current-month {
     font-size: 1.1rem;
     font-weight: bold;
   }
 
-  /* 월 이동 버튼 */
   .react-datepicker__navigation {
     top: 9px;
   }
 
-  /* 각 월 달력 사이의 경계선 */
   .react-datepicker__month-container + .react-datepicker__month-container {
     border-left: 1px solid #eee;
   }
@@ -129,7 +108,6 @@ const SearchBar = styled.div`
     box-sizing: border-box;
   }
 
-  /* 간격 요일과 숫자 간격 조절*/
   .react-datepicker__day-names,
   .react-datepicker__week {
     display: flex;
@@ -138,15 +116,14 @@ const SearchBar = styled.div`
 
   .react-datepicker__day-name,
   .react-datepicker__day {
-    width: 36px; /* 너비를 px 단위로 강제 고정 */
-    height: 36px; /* 높이를 px 단위로 강제 고정 */
-    line-height: 36px; /* 세로 중앙 정렬 */
-    margin: 2px; /* 모든 칸의 마진을 동일하게 설정 */
-    padding: 0; /* 내부 패딩 초기화 */
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    margin: 2px;
+    padding: 0;
     text-align: center;
   }
 
-  /* --- 나머지 커스텀 스타일 --- */
   .react-datepicker__day--weekend:first-of-type {
     color: red !important;
   }
@@ -163,39 +140,39 @@ const SearchBar = styled.div`
 const RecommendationsList = styled.ul<{ isVisible: boolean }>`
   display: ${({ isVisible }) => (isVisible ? 'block' : 'none')};
   position: absolute;
-  top: 100%; /* 검색창 바로 아래에 위치 */
+  top: 100%;
   left: 0;
   right: 0;
-  background-color: ${({ theme }) => theme.colors.white}; //
-  border: 1px solid ${({ theme }) => theme.colors.border}; //
+  background-color: ${({ theme }) => theme.colors.white};
+  border: 1px solid ${({ theme }) => theme.colors.border};
   border-top: none;
   border-radius: 0 0 8px 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   list-style-type: none;
   padding: 0.5rem 0;
   margin: 0;
-  z-index: 10; /* 달력보다 위에 오도록 (필요시 조절) */
+  z-index: 10;
 `;
 
 const RecommendationItem = styled.li`
   padding: 0.75rem 1rem;
   font-size: 1rem;
-  color: ${({ theme }) => theme.colors.text}; //
+  color: ${({ theme }) => theme.colors.text};
   cursor: pointer;
 
   &:hover {
-    background-color: ${({ theme }) => theme.colors.background}; //
+    background-color: ${({ theme }) => theme.colors.background};
   }
 `;
 
 const SearchInput = styled.input`
-  flex: 1;
-  min-width: 280px;
+  width: 100%; /* width 100%로 변경 */
   padding: 12px 16px;
   font-size: 16px;
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 8px;
   transition: border-color 0.2s;
+  box-sizing: border-box; /* box-sizing 추가 */
 
   &:focus {
     outline: none;
@@ -246,17 +223,28 @@ const CardGrid = styled.div`
   gap: 2rem;
 `;
 
-// <-- 2. <Link>의 기본 스타일(밑줄, 파란색)을 없애는 새 스타일 컴포넌트
 const StyledLink = styled(Link)`
-  text-decoration: none; /* 밑줄 제거 */
-  color: inherit; /* 글자색을 부모 요소에서 상속 */
-  display: block; /* 카드 영역 전체를 링크로 만듦 */
+  text-decoration: none;
+  color: inherit;
+  display: block;
 `;
 
+// 서울 지역구 데이터
+const seoulDistricts = [
+  { id: 'seoul-1', name: '은평구' },
+  { id: 'seoul-2', name: '동작구' },
+  { id: 'seoul-3', name: '서초구' },
+  { id: 'seoul-4', name: '용산구' },
+];
 
-// --- 홈페이지 컴포넌트 ---
+interface RecommendationItem {
+  id: number | string;
+  name: string;
+}
 
 export default function HomePage() {
+  const navigate = useNavigate(); // 페이지 이동을 위한 hook
+
   const [destination, setDestination] = useState("");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
@@ -265,17 +253,14 @@ export default function HomePage() {
   const getRecommendationList = (): RecommendationItem[] => {
     const normalizedInput = destination.toLowerCase().trim();
 
-    // "서울"을 정확히 입력하면 서울의 구 목록을 반환
     if (normalizedInput === '서울') {
       return seoulDistricts;
     }
 
-    // 입력값이 비어있으면 전체 도시 목록을 반환
     if (normalizedInput === '') {
       return cityData;
     }
 
-    // 그 외의 경우, cityData에서 필터링 (예: "부" -> "부산")
     return cityData.filter(city =>
       city.name.toLowerCase().includes(normalizedInput)
     );
@@ -283,38 +268,50 @@ export default function HomePage() {
 
   const currentRecommendations = getRecommendationList();
 
+  // --- 👇 핵심 수정: 검색 버튼 핸들러 ---
   const handleSearch = () => {
-    let dateInfo = "전체";
-    if (startDate && endDate) {
-      // 시작일과 종료일이 모두 선택된 경우
-      dateInfo = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
-    } else if (startDate) {
-      // 시작일만 선택된 경우
-      dateInfo = `${startDate.toLocaleDateString()} -`;
+    // 1. 유효성 검사: 입력값이 비어있는지 확인
+    if (!destination.trim()) {
+      alert("여행지를 선택해주세요.");
+      return;
+    }
+    if (!startDate || !endDate) {
+      alert("여행 날짜(시작일과 종료일)를 모두 선택해주세요.");
+      return;
     }
 
-    alert(`검색 정보:\n여행지: ${destination || '전체'}\n시작일: ${startDate ? startDate.toLocaleDateString() : '미정'}\n종료일: ${endDate ? endDate.toLocaleDateString() : '미정'}`);
+    // 2. 입력된 여행지와 일치하는 도시 찾기
+    // (서울의 구를 선택한 경우도 처리하려면 로직 확장이 필요하지만, 일단 cityData 기준)
+    const selectedCity = cityData.find(city => city.name === destination.trim());
+    
+    // "서울 은평구" 처럼 복합적인 이름일 경우 앞부분만 따서 "서울"로 매칭 시도
+    const complexCityMatch = cityData.find(city => destination.trim().startsWith(city.name));
+
+    const targetCity = selectedCity || complexCityMatch;
+
+    if (targetCity) {
+      // 3. 도시를 찾았으면 해당 도시 ID로 이동
+      navigate(`/travel-route/${targetCity.id}`);
+    } else {
+      // 도시 데이터에 없는 경우 (예: 직접 타이핑했는데 없는 도시)
+      alert("제공되지 않는 여행지이거나 잘못된 입력입니다. 추천 목록에서 선택해주세요.");
+    }
   };
 
   const handleRecommendationClick = (item: RecommendationItem) => {
-    // 클릭한 항목이 'seoulDistricts'에 포함된 구 이름인지 확인
     const isDistrict = seoulDistricts.some(d => d.name === item.name);
     
     if (isDistrict) {
-      // 구 이름("은평구")을 클릭하면 "서울 은평구"로 값을 설정
       setDestination(`서울 ${item.name}`);
     } else {
-      // 도시 이름("서울")을 클릭하면 해당 도시 이름으로 값을 설정
       setDestination(item.name);
     }
-    setShowRecommendations(false); // 목록 숨기기
+    setShowRecommendations(false);
   };
 
   return (
     <PageWrapper>
-      
       <MainContent>
-        {/* ... (HeroSection, SearchBar 등은 그대로) ... */}
         <HeroSection>
           <SearchBar>
             <SearchContainer>
@@ -324,20 +321,17 @@ export default function HomePage() {
                 value={destination}
                 onChange={(e) => {
                   setDestination(e.target.value);
-                  setShowRecommendations(true); // 입력 시에도 목록 표시
+                  setShowRecommendations(true);
                 }}
-                onFocus={() => setShowRecommendations(true)} // 포커스 시 목록 표시
+                onFocus={() => setShowRecommendations(true)}
                 onBlur={() => {
-                  // 잠시 후 목록 숨기기 (클릭 이벤트가 먼저 실행되도록)
                   setTimeout(() => setShowRecommendations(false), 150);
                 }}
               />
-              {/* 👇 7. 추천 검색어 목록 렌더링 */}
               <RecommendationsList isVisible={showRecommendations && currentRecommendations.length > 0}>
                 {currentRecommendations.map((item) => (
                   <RecommendationItem
                     key={item.id}
-                    // onClick 대신 onMouseDown을 사용해야 onBlur보다 먼저 실행됩니다.
                     onMouseDown={() => handleRecommendationClick(item)}
                   >
                     {item.name}
@@ -350,44 +344,39 @@ export default function HomePage() {
               locale="ko"
               selected={startDate}
               onChange={(date: Date | null) => setStartDate(date)}
-              selectsStart // 기간 선택의 '시작'임을 명시
+              selectsStart
               startDate={startDate}
               endDate={endDate}
               isClearable={true}
               placeholderText="시작일"
               dateFormat="yyyy-MM-dd"
-              monthsShown={1} // 달력 1개만 표시
+              monthsShown={1}
               minDate={new Date()}
             />
             
-            {/* (4) '종료일' DatePicker*/}
             <DatePicker
               locale="ko"
               selected={endDate}
               onChange={(date: Date | null) => setEndDate(date)}
-              selectsEnd // 기간 선택의 '종료'임을 명시
+              selectsEnd
               startDate={startDate}
               endDate={endDate}
               isClearable={true}
               placeholderText="종료일"
               dateFormat="yyyy-MM-dd"
-              monthsShown={1} // 달력 1개만 표시
-              minDate={startDate || new Date()} // 시작일보다 빠를 수 없음
+              monthsShown={1}
+              minDate={startDate || new Date()}
             />
             <SearchButton onClick={handleSearch}>검색</SearchButton>
           </SearchBar>
         </HeroSection>
 
-
         <CardGridSection>
           <h2>어디로 떠나볼까요?</h2>
           <CardGrid>
-            {/* <-- 3. .map() 내부를 <StyledLink>로 감싸줍니다. */}
             {cityData.map((city) => (
-              // map() 안의 최상위 요소에 key를 줘야 합니다.
               <StyledLink key={city.id} to={`/travel-route/${city.id}`}>
                 <CityCard
-                  // key는 StyledLink로 이동
                   name={city.name}
                   description={city.description}
                   imageUrl={city.imageUrl}
