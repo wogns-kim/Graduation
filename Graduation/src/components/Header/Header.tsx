@@ -1,22 +1,20 @@
 import styled from "@emotion/styled";
+import { css } from "@emotion/react"; // 1. css import 추가
 import { Link } from "react-router-dom";
 
-console.log("VITE_KAKAO_REST_API_KEY:", import.meta.env.VITE_KAKAO_REST_API_KEY);
-console.log("VITE_KAKAO_REDIRECT_URI:", import.meta.env.VITE_KAKAO_REDIRECT_URI);
 // --- 카카오 로그인 설정 ---
 const KAKAO_REST_API_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY;
-const REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI; // 로컬용
+const REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI;
 const KAKAO_AUTH_URL = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`;
 
-// --- Header가 받을 Props 타입 정의 ---
+// --- HeaderProps 정의 ---
 interface HeaderProps {
   isLoggedIn: boolean;
   onLogoutClick: () => void;
-  // onLoginClick은 LoginModal을 안 쓰므로 제거
+  onCodeClick: () => void; // 코드 입력 모달 열기 함수
 }
 
 // --- 스타일 컴포넌트 ---
-
 const HeaderContainer = styled.header`
   display: flex;
   justify-content: space-between;
@@ -63,15 +61,14 @@ const KakaoLoginButton = styled.button`
   cursor: pointer;
   
   img {
-    display: block; // 이미지 기본 여백 제거
-    width: 183px; // 카카오 가이드에 맞는 기본 크기 (medium-wide)
+    display: block;
+    width: 183px;
     
     &:hover {
-      opacity: 0.9; // 간단한 호버 효과
+      opacity: 0.9;
     }
   }
 
-  // 모바일에서는 이미지를 조금 줄일 수 있습니다.
   @media (max-width: 768px) {
     img {
       width: 150px;
@@ -79,20 +76,25 @@ const KakaoLoginButton = styled.button`
   }
 `;
 
-// '마이페이지', '로그아웃' 버튼으로 재사용할 NavButton 스타일 정의
-const NavButton = styled('a')<{ primary?: boolean; as?: 'a' | 'button' | typeof Link }>`
+// ✅ 2. 공통 버튼 스타일 정의 (css 사용)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const navButtonStyle = (theme: any, primary?: boolean) => css`
   padding: 8px 16px;
   border-radius: 20px;
-  border: 1px solid ${({ theme, primary }) => (primary ? 'transparent' : theme.colors.border)};
+  border: 1px solid ${primary ? 'transparent' : theme.colors.border};
   cursor: pointer;
   font-size: 15px;
   font-weight: 600;
-  background-color: ${({ theme, primary }) => (primary ? theme.colors.primary : theme.colors.white)};
-  color: ${({ theme, primary }) => (primary ? theme.colors.white : theme.colors.text)};
+  background-color: ${primary ? theme.colors.primary : theme.colors.white};
+  color: ${primary ? theme.colors.white : theme.colors.text};
   transition: all 0.2s ease-in-out;
   text-decoration: none;
-  display: inline-block;
-  text-align: center;
+  display: inline-flex; /* 텍스트 중앙 정렬 */
+  align-items: center;
+  justify-content: center;
+  
+  /* a 태그나 Link로 쓰일 때를 위해 */
+  box-sizing: border-box; 
 
   &:hover {
     transform: translateY(-2px);
@@ -105,37 +107,49 @@ const NavButton = styled('a')<{ primary?: boolean; as?: 'a' | 'button' | typeof 
   }
 `;
 
+// ✅ 3. Link용 버튼 (마이페이지 이동용)
+const LinkButton = styled(Link)<{ primary?: boolean }>`
+  ${({ theme, primary }) => navButtonStyle(theme, primary)}
+`;
+
+// ✅ 4. 일반 button용 버튼 (로그인/로그아웃용)
+const ActionButton = styled.button<{ primary?: boolean }>`
+  ${({ theme, primary }) => navButtonStyle(theme, primary)}
+`;
+
 
 // --- Header 컴포넌트 ---
-function Header({ isLoggedIn, onLogoutClick }: HeaderProps) {
+function Header({ isLoggedIn, onLogoutClick, onCodeClick }: HeaderProps) {
 
-  // ✅ 1. 팝업창을 띄우는 함수를 정의합니다.
   const handleKakaoLogin = () => {
     window.open(KAKAO_AUTH_URL, "kakaoLogin", "width=500,height=600");
   };
 
   return (
     <HeaderContainer>
-      {/* 로고 클릭 시 홈('/')으로 이동 */}
       <StyledLink to="/">
         <Logo>First Trip</Logo>
       </StyledLink>
 
-      {/*isLoggedIn 상태에 따라 다른 버튼들을 렌더링 */}
       <Nav>
         {isLoggedIn ? (
-          // --- 1. 로그인 되었을 때 ---
+          // --- 로그인 상태일 때 ---
           <>
-            {/* NavButton을 Link처럼 사용하기 위해 as={Link} 사용 */}
-            <NavButton as={Link} to="/mypage">
+            {/* LinkButton 사용 (to 속성 문제 해결됨) */}
+            <ActionButton onClick={onCodeClick}>
+              코드 입력
+            </ActionButton>
+
+            <LinkButton to="/mypage">
               마이페이지
-            </NavButton>
-            <NavButton as="button" type="button" onClick={onLogoutClick} primary>
+            </LinkButton>
+            {/* ActionButton 사용 */}
+            <ActionButton onClick={onLogoutClick} primary>
               로그아웃
-            </NavButton>
+            </ActionButton>
           </>
         ) : (
-          // --- 2. 로그인 안 되었을 때 ---
+          // --- 로그아웃 상태일 때 ---
           <>
             {/* 카카오 로그인 버튼 */}
             <KakaoLoginButton onClick={handleKakaoLogin}>
