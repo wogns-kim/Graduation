@@ -1,8 +1,6 @@
-// src/pages/HomePage/index.tsx
-
 import { useState } from "react";
 import styled from "@emotion/styled";
-import { Link, useNavigate } from "react-router-dom"; 
+import { Link, useNavigate } from "react-router-dom"; // useNavigate 추가
 
 // 달력 UI
 import DatePicker, { registerLocale } from "react-datepicker";
@@ -16,7 +14,8 @@ registerLocale('ko', ko);
 import CityCard from "../../components/CityCard/CityCard";
 import { cityData } from "../../data/cityData";
 
-// --- 스타일 컴포넌트 (변경 없음) ---
+// --- 스타일 컴포넌트 (기존과 동일) ---
+// (기존 스타일 코드는 그대로 두시면 됩니다. 여기서는 생략하지 않고 전체 구조를 보여드릴게요)
 
 const PageWrapper = styled.div`
   min-height: 100vh;
@@ -56,7 +55,7 @@ const SearchBar = styled.div`
   
   .react-datepicker-wrapper {
     flex: 1;
-    min-width: 180px;
+    min-width: 180px; /* 오타 수정: mid-width -> min-width */
   }
   .react-datepicker__input-container input {
     width: 100%;
@@ -73,17 +72,69 @@ const SearchBar = styled.div`
     }
   }
 
-  .react-datepicker-popper { z-index: 2; }
-  .react-datepicker { font-size: 1rem; border: 1px solid #e0e0e0; border-radius: 8px; background-color: white; }
-  .react-datepicker__header { background-color: white; border-bottom: 1px solid #eee; padding: 10px 0 8px 0; }
-  .react-datepicker__current-month { font-size: 1.1rem; font-weight: bold; }
-  .react-datepicker__navigation { top: 9px; }
-  .react-datepicker__month-container + .react-datepicker__month-container { border-left: 1px solid #eee; }
-  .react-datepicker *, .react-datepicker *:before, .react-datepicker *:after { box-sizing: border-box; }
-  .react-datepicker__day-names, .react-datepicker__week { display: flex; justify-content: space-between; }
-  .react-datepicker__day-name, .react-datepicker__day { width: 36px; height: 36px; line-height: 36px; margin: 2px; padding: 0; text-align: center; }
-  .react-datepicker__day--weekend:first-of-type { color: red !important; }
-  .react-datepicker__day--selected, .react-datepicker__day--in-selecting-range, .react-datepicker__day--in-range { background-color: #3c73ec; color: white; border-radius: 50%; }
+  .react-datepicker-popper {
+    z-index: 100; /* z-index 높임 (추천 목록보다 높게) */
+  }
+
+  .react-datepicker {
+    font-size: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background-color: white;
+  }
+
+  .react-datepicker__header {
+    background-color: white;
+    border-bottom: 1px solid #eee;
+    padding: 10px 0 8px 0;
+  }
+
+  .react-datepicker__current-month {
+    font-size: 1.1rem;
+    font-weight: bold;
+  }
+
+  .react-datepicker__navigation {
+    top: 9px;
+  }
+
+  .react-datepicker__month-container + .react-datepicker__month-container {
+    border-left: 1px solid #eee;
+  }
+
+  .react-datepicker *,
+  .react-datepicker *:before,
+  .react-datepicker *:after {
+    box-sizing: border-box;
+  }
+
+  .react-datepicker__day-names,
+  .react-datepicker__week {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .react-datepicker__day-name,
+  .react-datepicker__day {
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    margin: 2px;
+    padding: 0;
+    text-align: center;
+  }
+
+  .react-datepicker__day--weekend:first-of-type {
+    color: red !important;
+  }
+
+  .react-datepicker__day--selected,
+  .react-datepicker__day--in-selecting-range,
+  .react-datepicker__day--in-range {
+    background-color: #3c73ec;
+    color: white;
+    border-radius: 50%;
+  }
 `;
 
 const RecommendationsList = styled.ul<{ isVisible: boolean }>`
@@ -115,13 +166,13 @@ const RecommendationItem = styled.li`
 `;
 
 const SearchInput = styled.input`
-  flex: 1;
-  min-width: 280px;
+  width: 100%; /* width 100%로 변경 */
   padding: 12px 16px;
   font-size: 16px;
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 8px;
   transition: border-color 0.2s;
+  box-sizing: border-box; /* box-sizing 추가 */
 
   &:focus {
     outline: none;
@@ -178,7 +229,7 @@ const StyledLink = styled(Link)`
   display: block;
 `;
 
-// --- 데이터 ---
+// 서울 지역구 데이터
 const seoulDistricts = [
   { id: 'seoul-1', name: '은평구' },
   { id: 'seoul-2', name: '동작구' },
@@ -192,11 +243,14 @@ interface RecommendationItemType {
 }
 
 
-// --- 홈페이지 컴포넌트 ---
+interface RecommendationItem {
+  id: number | string;
+  name: string;
+}
 
 export default function HomePage() {
-  const navigate = useNavigate();
-  
+  const navigate = useNavigate(); // 페이지 이동을 위한 hook
+
   const [destination, setDestination] = useState("");
   const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [endDate, setEndDate] = useState<Date | null>(new Date());
@@ -205,9 +259,18 @@ export default function HomePage() {
   // 추천 검색어 로직
   const getRecommendationList = (): RecommendationItemType[] => {
     const normalizedInput = destination.toLowerCase().trim();
-    if (normalizedInput === '서울') return seoulDistricts;
-    if (normalizedInput === '') return cityData;
-    return cityData.filter(city => city.name.toLowerCase().includes(normalizedInput));
+
+    if (normalizedInput === '서울') {
+      return seoulDistricts;
+    }
+
+    if (normalizedInput === '') {
+      return cityData;
+    }
+
+    return cityData.filter(city =>
+      city.name.toLowerCase().includes(normalizedInput)
+    );
   };
 
   const currentRecommendations = getRecommendationList();
