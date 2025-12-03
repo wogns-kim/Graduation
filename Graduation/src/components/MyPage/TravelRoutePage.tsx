@@ -1,519 +1,540 @@
-import React, { useEffect, useState, useRef } from 'react';
-import styled from "@emotion/styled";
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { MapPin, Trash2, Users, Plus, FileText, Search, Save, Share2, Clock } from "lucide-react";
-
-// --- Kakao SDK 타입 정의 ---
 declare global {
     interface Window {
         kakao: any;
     }
+    interface ImportMetaEnv {
+        readonly VITE_KAKAO_JAVASCRIPT_KEY: string;
+    }
+    interface ImportMeta {
+        readonly env: ImportMetaEnv;
+    }
 }
 
-// --- 데이터 타입 정의 ---
-interface ItineraryItem {
-  item_id: number;
-  place_name: string;
-  order_in_day: number;
-  place_id?: number;
-  // 지도 표시를 위해 좌표 추가 (검색 후 채워짐)
-  lat?: number;
-  lng?: number;
-}
+export { };
 
-interface UserSimple {
-  user_id: number;
-  username: string;
-  profile_image_url: string | null;
-}
+import React, { useState, useEffect, useRef } from "react";
+// ★ [수정] Share2 아이콘 추가됨
+import { MapPin, Info, Trash2, Map as MapIcon, Users, Plus, Minus, FileText, Search, Save, Share2 } from "lucide-react";
 
-interface TripDetails {
-  trip_name: string;
-  participants: UserSimple[];
-  itineraries: Record<string, Record<string, ItineraryItem[]>>;
-  alternatives?: string[]; 
-  isAiResult?: boolean;    
-}
+// ... (데이터 타입 정의) ...
+interface TripPoint { lat: number; lng: number; address: string; sourceId?: number; }
+interface TripFolder { id: number; title: string; participants: number; points: TripPoint[]; }
+interface Recommendation { id: number; title: string; description: string; lat: number; lng: number; }
 
-// 로그 데이터 타입
-interface TripLog {
-    action_id: number;
-    action_type: string;
-    user_name: string;
-    description: string;
-    created_at: string;
-}
-
-// --- 스타일 정의 (기존 유지 + 로그 스타일 추가) ---
-const PageContainer = styled.div`
-  padding: 40px 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-  background-color: #f8f9fa;
-  min-height: 100vh;
-`;
-
-const HeaderSection = styled.div`margin-bottom: 30px;`;
-const HeaderContent = styled.div`display: flex; justify-content: space-between; align-items: center;`;
-const TitleGroup = styled.div``;
-const Title = styled.h1`font-size: 2.2rem; font-weight: 800; color: #333; margin: 0 0 10px 0;`;
-const SubTitle = styled.p`color: #666; margin-top: 8px; font-size: 1rem;`;
-const HeaderActions = styled.div`display: flex; align-items: center; gap: 10px;`;
-const ShareButton = styled.button`display: flex; align-items: center; gap: 5px; background: #f0f4ff; color: #667eea; border: 1px solid #dbeafe; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; white-space: nowrap; &:hover { background: #e0e7ff; }`;
-const ParticipantBadge = styled.div`display: flex; align-items: center; gap: 4px; font-size: 13px; color: #4a5568; background: #f7fafc; padding: 4px 10px; border-radius: 15px;`;
-
-// 그리드 레이아웃 수정: 로그 섹션을 위해 행 추가
-const ContentGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1.5fr 1fr;
-  grid-template-rows: auto auto; // 로그 섹션 공간 확보
-  gap: 24px;
-  align-items: start;
-  
-  @media (max-width: 1200px) {
-    grid-template-columns: 1fr 1fr; 
-    grid-template-areas: 
-      "map schedule"
-      "recommend recommend"
-      "logs logs";
-  }
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    grid-template-areas: 
-      "map"
-      "schedule"
-      "recommend"
-      "logs";
-  }
-`;
-
-const MapSection = styled.div`
-  grid-area: map;
-  grid-row: 1 / 2; // 첫 번째 행
-  background-color: white;
-  border-radius: 16px;
-  height: 600px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  border: 1px solid #e2e8f0;
-  overflow: hidden;
-  position: sticky;
-  top: 20px;
-`;
-
-const ScheduleSection = styled.div`
-  grid-area: schedule;
-  grid-row: 1 / 3; // 길게 차지하도록
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-`;
-
-const DayCard = styled.div`background: white; padding: 24px; border-radius: 16px; border: 1px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.03);`;
-const DayHeader = styled.h3`font-size: 1.3rem; color: #3B82F6; margin: 0 0 16px 0; font-weight: 700; display: flex; align-items: center; &::before { content: ''; display: inline-block; width: 4px; height: 18px; background-color: #3B82F6; margin-right: 10px; border-radius: 2px; }`;
-const PlaceItem = styled.div`display: flex; align-items: center; padding: 16px; background-color: #f8f9fa; border-radius: 12px; margin-bottom: 10px; transition: transform 0.2s; &:hover { transform: translateX(4px); background-color: #f1f3f5; }`;
-const OrderBadge = styled.div`background-color: #333; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; margin-right: 14px; flex-shrink: 0;`;
-const PlaceInfo = styled.div`flex: 1;`;
-const PlaceName = styled.h4`font-size: 1rem; font-weight: 600; margin: 0 0 4px 0; color: #333;`;
-const PlaceDesc = styled.p`font-size: 0.85rem; color: #868e96; margin: 0;`;
-const EditButton = styled.button`padding: 6px 12px; font-size: 13px; color: #868e96; background: white; border: 1px solid #dee2e6; border-radius: 6px; cursor: pointer; margin-left: 10px; &:hover { color: #333; border-color: #adb5bd; }`;
-
-const RecommendSection = styled.div`
-  grid-area: recommend;
-  grid-row: 1 / 2;
-  background-color: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  height: fit-content;
-  max-height: 600px;
-  overflow-y: auto;
-`;
-
-const SectionTitle = styled.h3`font-size: 1.2rem; font-weight: 700; color: #333; margin: 0 0 20px 0; padding-bottom: 15px; border-bottom: 2px solid #eee; display: flex; align-items: center; gap: 8px;`;
-const RecommendItem = styled.div`padding: 16px; border: 1px solid #eee; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; transition: transform 0.2s; &:last-child { margin-bottom: 0; } &:hover { transform: translateX(3px); border-color: #667eea; }`;
-const RecommendInfo = styled.div`h4 { font-size: 0.95rem; font-weight: 600; margin: 0 0 4px 0; } p { font-size: 0.8rem; color: #868e96; margin: 0; }`;
-const AddButton = styled.button`padding: 6px 12px; font-size: 13px; color: #3B82F6; background: #EFF6FF; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; &:hover { background: #DBEAFE; }`;
-const SaveButton = styled.button`background-color: #10B981; color: white; padding: 6px 16px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 6px; &:hover { background-color: #059669; }`;
-
-const MapSearchBox = styled.form`position: absolute; top: 15px; left: 15px; z-index: 100; background: white; padding: 8px 12px; border-radius: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); display: flex; align-items: center; width: 280px; border: 1px solid #e2e8f0; transition: all 0.2s; &:focus-within { width: 320px; border-color: #667eea; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2); }`;
-const SearchInput = styled.input`border: none; outline: none; flex: 1; font-size: 14px; margin-left: 8px; color: #2d3748; &::placeholder { color: #a0aec0; }`;
-const MapOverlayHint = styled.div`position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 8px 20px; border-radius: 20px; font-size: 14px; z-index: 10; white-space: nowrap;`;
-
-// [추가] 로그 섹션 스타일
-const LogSection = styled.div`
-    grid-area: logs;
-    grid-column: 1 / 2; // 지도 아래 위치
-    grid-row: 2 / 3;
-    background: white;
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    border: 1px solid #e2e8f0;
-    max-height: 300px;
-    overflow-y: auto;
-`;
-
-const LogItem = styled.div`
-    padding: 8px 0;
-    border-bottom: 1px solid #f1f3f5;
-    font-size: 13px;
-    color: #4a5568;
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-
-    &:last-child { border-bottom: none; }
-    
-    span.time { color: #a0aec0; font-size: 11px; min-width: 60px; }
-    span.user { font-weight: bold; color: #333; }
-`;
-
-
-// --- 컴포넌트 ---
 export default function TravelRoutePage() {
-  const { cityId } = useParams(); // trip_id 또는 'ai-result'
-  const [searchParams] = useSearchParams(); 
-  const navigate = useNavigate();
-  
-  const [tripData, setTripData] = useState<TripDetails | null>(null);
-  const [logs, setLogs] = useState<TripLog[]>([]); // 로그 데이터 상태
-  const [isLoading, setIsLoading] = useState(true);
+    const mapRef = useRef<any>(null);
+    const markersRef = useRef<any[]>([]);
+    const polylineRef = useRef<any>(null);
+    const geocoderRef = useRef<any>(null);
+    const psRef = useRef<any>(null);
+    const selectedIdRef = useRef<number | null>(null);
 
-  // 지도 관련 refs
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const polylineRef = useRef<any>(null);
-  const psRef = useRef<any>(null);
+    const [selectedFolderId] = useState<number | null>(1);
+    const [searchKeyword, setSearchKeyword] = useState("");
 
-  const [searchKeyword, setSearchKeyword] = useState("");
-  const [shareCode] = useState(Math.random().toString(36).substring(2, 8).toUpperCase());
+    // ★ [추가] 무작위 공유 코드 생성 (컴포넌트 로드 시 1회 생성)
+    const [shareCode] = useState(Math.random().toString(36).substring(2, 8).toUpperCase());
 
-  // 1. 데이터 Fetching
-  useEffect(() => {
-    const fetchTripDetails = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        alert("로그인이 필요합니다.");
-        navigate("/");
-        return;
-      }
+    useEffect(() => { selectedIdRef.current = selectedFolderId; }, [selectedFolderId]);
 
-      const API_BASE = "http://127.0.0.1:8000/api";
-      
-      try {
-        // --- 1. AI 추천 ('ai-result') ---
-        if (cityId === 'ai-result') {
-            const startDate = searchParams.get('start');
-            const endDate = searchParams.get('end');
-            
-            const response = await fetch(`${API_BASE}/recommendations?start_date=${startDate}&end_date=${endDate}`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
+    const [travelFolders, setTravelFolders] = useState<TripFolder[]>([
+        { id: 1, title: "첫 번째 여행", participants: 4, points: [] },
+    ]);
 
-            if (!response.ok) throw new Error("AI 추천을 불러오는데 실패했습니다.");
-            const data = await response.json();
-            const firstCourse = data[0];
-            
-            const formattedItineraries: Record<string, ItineraryItem[]> = {};
-            
-            if (firstCourse && firstCourse.route) {
-                Object.entries(firstCourse.route).forEach(([day, places]) => {
-                    const placeList = Array.isArray(places) ? places : [];
-                    formattedItineraries[day] = placeList.map((placeName: string, idx: number) => ({
-                        item_id: idx, 
-                        place_name: placeName,
-                        order_in_day: idx + 1
-                    }));
-                });
-            }
-            
-            setTripData({
-                trip_name: firstCourse?.theme || "AI 추천 여행 코스",
-                participants: [], 
-                itineraries: { "ai": formattedItineraries }, 
-                alternatives: firstCourse?.alternatives || [],
-                isAiResult: true
-            });
+    const [recommendations] = useState<Recommendation[]>([
+        { id: 101, title: "북촌 한옥마을", description: "전통 가옥이 보존된 마을", lat: 37.582604, lng: 126.983697 },
+        { id: 102, title: "인사동", description: "전통 문화의 거리", lat: 37.574388, lng: 126.989326 },
+        { id: 103, title: "홍대 거리", description: "젊음의 문화 거리", lat: 37.557527, lng: 126.924466 },
+        { id: 104, title: "광장시장", description: "먹거리의 천국", lat: 37.570151, lng: 126.999385 },
+        { id: 105, title: "남산타워", description: "서울의 랜드마크", lat: 37.551169, lng: 126.988227 },
+        { id: 106, title: "경복궁", description: "조선의 법궁", lat: 37.579617, lng: 126.977041 },
+        { id: 107, title: "충청남도 당진시 석문면", description: "서해안 드라이브 코스", lat: 37.003, lng: 126.532 },
+        { id: 108, title: "충청남도 아산시 송악면", description: "아름다운 자연 경관", lat: 36.733, lng: 127.033 },
+    ]);
 
-        } 
-        // --- 2. 저장된 여행 조회 모드 (숫자 ID) ---
-        else {
-            const response = await fetch(`${API_BASE}/trips/${cityId}/details`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-
-            if (!response.ok) throw new Error("여행 정보를 불러오는데 실패했습니다.");
-            const data = await response.json();
-            
-            setTripData({
-                trip_name: data.trip_name,
-                participants: data.participants,
-                itineraries: data.itineraries,
-                isAiResult: false
-            });
-
-            // 로그 데이터 조회 (저장된 여행일 때만)
-            const historyRes = await fetch(`${API_BASE}/trips/${cityId}/history`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (historyRes.ok) {
-                setLogs(await historyRes.json());
-            }
-        }
-
-      } catch (error: any) {
-        console.error(error);
-        alert(`오류가 발생했습니다: ${error.message}`);
-        navigate("/mypage");
-      } finally {
-        setIsLoading(false);
-      }
+    // ★ [추가] 공유 코드 복사 핸들러
+    const handleCopyCode = () => {
+        navigator.clipboard.writeText(shareCode);
+        alert(`초대 코드 [${shareCode}]가 복사되었습니다!\n친구에게 공유해서 같이 여행을 계획해보세요. ✈️`);
     };
 
-    if (cityId) {
-      fetchTripDetails();
-    }
-  }, [cityId, navigate, searchParams]);
+    const handleSearch = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!searchKeyword.trim() || !psRef.current) return;
 
-
-  // --- 2. 지도 그리기 (마커 + 선 연결) ---
-  useEffect(() => {
-    if (isLoading || !tripData) return;
-
-    const kakaoAppKey = "c0ce14306decee109a46f80f30e7c0df"; // 상수로 입력
-    
-    const initializeMap = () => {
-        if (!window.kakao || !window.kakao.maps) return;
-
-        window.kakao.maps.load(() => {
-            const mapContainer = document.getElementById('map');
-            if (!mapContainer) return;
-            
-            // 지도 생성 (최초 1회만 하거나, 이미 있으면 재사용)
-            if (!mapRef.current) {
-                const mapOption = { center: new window.kakao.maps.LatLng(37.566826, 126.9786567), level: 7 };
-                mapRef.current = new window.kakao.maps.Map(mapContainer, mapOption);
-                psRef.current = new window.kakao.maps.services.Places();
+        psRef.current.keywordSearch(searchKeyword, (data: any, status: any) => {
+            if (status === window.kakao.maps.services.Status.OK) {
+                const place = data[0];
+                const moveLatLon = new window.kakao.maps.LatLng(place.y, place.x);
+                mapRef.current.panTo(moveLatLon);
+            } else if (status === window.kakao.maps.services.Status.ZERO_RESULT) {
+                alert('검색 결과가 존재하지 않습니다.');
+            } else if (status === window.kakao.maps.services.Status.ERROR) {
+                alert('검색 중 오류가 발생했습니다.');
             }
-
-            // 기존 마커/라인 제거
-            markersRef.current.forEach((m: any) => m.setMap(null));
-            markersRef.current = [];
-            if (polylineRef.current) polylineRef.current.setMap(null);
-
-            // 현재 표시할 일정 데이터 수집
-            const targetUserId = tripData.isAiResult ? "ai" : (tripData.participants[0]?.user_id.toString() || "");
-            const myItinerary = tripData.itineraries[targetUserId] || {};
-            const sortedDays = Object.keys(myItinerary).sort();
-            
-            // 순서대로 장소 이름 수집
-            const allPlaceNames: string[] = [];
-            sortedDays.forEach(day => {
-                myItinerary[day].forEach(item => allPlaceNames.push(item.place_name));
-            });
-
-            if (allPlaceNames.length === 0) return;
-
-            // 장소 검색 및 마커 표시 (순서 보장 위해 Promise 사용)
-            const searchPromises = allPlaceNames.map((name) => {
-                return new Promise<any>((resolve) => {
-                    psRef.current.keywordSearch(name, (data: any, status: any) => {
-                        if (status === window.kakao.maps.services.Status.OK) {
-                            resolve({ name, lat: data[0].y, lng: data[0].x });
-                        } else {
-                            resolve(null); // 검색 실패 시
-                        }
-                    });
-                });
-            });
-
-            Promise.all(searchPromises).then((results) => {
-                const validResults = results.filter((r) => r !== null);
-                const linePath: any[] = [];
-                const bounds = new window.kakao.maps.LatLngBounds();
-
-                validResults.forEach((place, index) => {
-                    const position = new window.kakao.maps.LatLng(place.lat, place.lng);
-                    
-                    // 마커 생성 (순서 번호 표시)
-                    const markerImage = new window.kakao.maps.MarkerImage(
-                        "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_number_blue.png",
-                        new window.kakao.maps.Size(36, 37),
-                        {
-                            spriteSize: new window.kakao.maps.Size(36, 691),
-                            spriteOrigin: new window.kakao.maps.Point(0, (index * 46) + 10),
-                            offset: new window.kakao.maps.Point(13, 37)
-                        }
-                    );
-                    
-                    const marker = new window.kakao.maps.Marker({
-                        position: position,
-                        image: markerImage,
-                        map: mapRef.current
-                    });
-                    
-                    markersRef.current.push(marker);
-                    linePath.push(position);
-                    bounds.extend(position);
-                });
-
-                // 선(Polyline) 그리기
-                if (linePath.length > 1) {
-                    const polyline = new window.kakao.maps.Polyline({
-                        path: linePath,
-                        strokeWeight: 5,
-                        strokeColor: '#3B82F6',
-                        strokeOpacity: 0.8,
-                        strokeStyle: 'solid'
-                    });
-                    polyline.setMap(mapRef.current);
-                    polylineRef.current = polyline;
-                }
-
-                // 지도 범위 재설정
-                if (validResults.length > 0) {
-                    mapRef.current.setBounds(bounds);
-                }
-            });
         });
     };
 
-    // SDK 로드 확인
-    const existingScript = document.querySelector(`script[src*="dapi.kakao.com/v2/maps/sdk.js"]`);
-    if (existingScript) {
-        if (window.kakao && window.kakao.maps) initializeMap();
-        else existingScript.addEventListener("load", initializeMap);
-    } else {
-        const script = document.createElement("script");
-        script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=c0ce14306decee109a46f80f30e7c0df&libraries=services&autoload=false`;
-        script.async = false;
-        script.onload = () => setTimeout(initializeMap, 100);
-        document.head.appendChild(script);
-    }
+    const handleSave = () => {
+        const currentFolder = travelFolders.find(f => f.id === selectedFolderId);
+        if (!currentFolder) return;
+        console.log("저장할 데이터:", currentFolder);
+        alert(`'${currentFolder.title}' 경로가 저장되었습니다! (총 ${currentFolder.points.length}개 장소)`);
+    };
 
-  }, [tripData, isLoading]); // 데이터가 로드되면 지도 그리기
+    const handleMapClick = (lat: number, lng: number) => {
+        const currentId = selectedIdRef.current;
+        if (!currentId || !geocoderRef.current) return;
+        geocoderRef.current.coord2RegionCode(lng, lat, (result: any, status: any) => {
+            if (status === window.kakao.maps.services.Status.OK) {
+                const addressName = result[0].address_name;
+                const newPoint: TripPoint = { lat, lng, address: addressName };
+                setTravelFolders(prev => prev.map(folder => {
+                    if (folder.id === currentId) return { ...folder, points: [...folder.points, newPoint] };
+                    return folder;
+                }));
+            }
+        });
+    };
+    const toggleRecommendation = (rec: Recommendation) => {
+        if (!selectedFolderId) { alert("먼저 여행 폴더를 선택해주세요! 👆"); return; }
+        setTravelFolders(prev => prev.map(folder => {
+            if (folder.id === selectedFolderId) {
+                const exists = folder.points.some(p => p.sourceId === rec.id);
+                if (exists) return { ...folder, points: folder.points.filter(p => p.sourceId !== rec.id) };
+                else {
+                    const newPoint: TripPoint = { lat: rec.lat, lng: rec.lng, address: rec.title, sourceId: rec.id };
+                    return { ...folder, points: [...folder.points, newPoint] };
+                }
+            }
+            return folder;
+        }));
+    };
+    const deletePoint = (folderId: number, pointIndex: number) => {
+        setTravelFolders(prev => prev.map(folder => {
+            if (folder.id === folderId) {
+                const newPoints = folder.points.filter((_, index) => index !== pointIndex);
+                return { ...folder, points: newPoints };
+            }
+            return folder;
+        }));
+    };
 
+    useEffect(() => {
+        if (!mapRef.current || !window.kakao) return;
+        markersRef.current.forEach(m => m.setMap(null));
+        markersRef.current = [];
+        if (polylineRef.current) polylineRef.current.setMap(null);
+        if (!selectedFolderId) return;
+        const currentFolder = travelFolders.find(f => f.id === selectedFolderId);
+        if (!currentFolder || currentFolder.points.length === 0) return;
+        const path: any[] = [];
+        currentFolder.points.forEach((point, index) => {
+            const position = new window.kakao.maps.LatLng(point.lat, point.lng);
+            path.push(position);
+            const content = `
+                <div style="position: relative; width: 0; height: 0;">
+                    <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 4px 10px; border-radius: 15px; border: 1px solid #667eea; font-size: 12px; font-weight: bold; color: #667eea; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); pointer-events: none;">${point.address}</div>
+                    <div style="position: absolute; top: 0; left: 0; transform: translate(-50%, -50%); width: 24px; height: 24px; background: #667eea; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${index + 1}</div>
+                </div>`;
+            const overlay = new window.kakao.maps.CustomOverlay({ position: position, content: content, map: mapRef.current });
+            markersRef.current.push(overlay);
+        });
+        if (path.length > 1) {
+            const polyline = new window.kakao.maps.Polyline({ path: path, strokeWeight: 5, strokeColor: '#667eea', strokeOpacity: 0.8, strokeStyle: 'solid' });
+            polyline.setMap(mapRef.current);
+            polylineRef.current = polyline;
+        }
+        const lastPoint = path[path.length - 1];
+        mapRef.current.panTo(lastPoint);
+    }, [travelFolders, selectedFolderId]);
 
-  // --- 핸들러 ---
-  const handleSaveTrip = async () => {
-      alert("여행 저장 기능은 추후 구현 예정입니다! (POST /api/trips)");
-  };
-  const handleCopyCode = () => {
-      navigator.clipboard.writeText(shareCode);
-      alert(`초대 코드 [${shareCode}]가 복사되었습니다!`);
-  };
-  const handleMapSearch = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!searchKeyword.trim() || !psRef.current) return;
-      psRef.current.keywordSearch(searchKeyword, (data: any, status: any) => {
-          if (status === window.kakao.maps.services.Status.OK) {
-              const place = data[0];
-              const moveLatLon = new window.kakao.maps.LatLng(place.y, place.x);
-              mapRef.current.panTo(moveLatLon);
-          } else {
-              alert('검색 결과가 없습니다.');
-          }
-      });
-  };
+    useEffect(() => {
+        const kakaoAppKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY;
+        if (!kakaoAppKey) return;
+        const initializeMap = () => {
+            if (window.kakao && window.kakao.maps) {
+                window.kakao.maps.load(() => {
+                    const mapContainer = document.getElementById('map');
+                    if (!mapContainer) return;
+                    const mapOption = { center: new window.kakao.maps.LatLng(37.566826, 126.9786567), level: 7 };
+                    const map = new window.kakao.maps.Map(mapContainer, mapOption);
+                    mapRef.current = map;
+                    geocoderRef.current = new window.kakao.maps.services.Geocoder();
+                    psRef.current = new window.kakao.maps.services.Places();
 
-  // 화면 렌더링 준비
-  if (isLoading) return <div style={{textAlign:'center', padding:'100px', fontSize: '1.2rem'}}>AI가 코스를 생성 중입니다... 🤖</div>;
-  if (!tripData) return <div>데이터가 없습니다.</div>;
+                    window.kakao.maps.event.addListener(map, 'click', function (mouseEvent: any) {
+                        handleMapClick(mouseEvent.latLng.getLat(), mouseEvent.latLng.getLng());
+                    });
+                });
+            }
+        };
+        const existingScript = document.querySelector(`script[src*="dapi.kakao.com/v2/maps/sdk.js"]`);
+        if (existingScript) {
+            if (window.kakao && window.kakao.maps) initializeMap();
+            else existingScript.addEventListener("load", initializeMap);
+        } else {
+            const script = document.createElement("script");
+            script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&libraries=services&autoload=false`;
+            script.async = false;
+            script.onload = () => setTimeout(initializeMap, 100);
+            document.head.appendChild(script);
+        }
+    }, []);
 
-  const targetUserId = tripData.isAiResult ? "ai" : (tripData.participants[0]?.user_id.toString() || "");
-  const myItinerary = tripData.itineraries[targetUserId] || {};
-  const sortedDays = Object.keys(myItinerary).sort();
+    const currentActiveFolder = travelFolders.find(f => f.id === selectedFolderId);
 
-  return (
-    <PageContainer>
-      <HeaderSection>
-        <HeaderContent>
-            <TitleGroup>
-                <Title>{tripData.trip_name}</Title>
-                <SubTitle>{tripData.isAiResult ? "AI 추천 코스" : "나의 여행 계획"}</SubTitle>
-            </TitleGroup>
-            <HeaderActions>
-                {tripData.isAiResult && (
-                    <SaveButton onClick={handleSaveTrip}>
-                        <Save size={16} /><span>저장</span>
-                    </SaveButton>
-                )}
-                <ShareButton onClick={handleCopyCode}>
-                    <Share2 size={16} /><span>초대 코드: {shareCode}</span>
-                </ShareButton>
-            </HeaderActions>
-        </HeaderContent>
-      </HeaderSection>
-      
-      <ContentGrid>
-        {/* 1. 지도 영역 */}
-        <MapSection>
-             <MapSearchBox onSubmit={handleMapSearch}>
-                <Search size={18} color="#718096" />
-                <SearchInput type="text" placeholder="장소 검색" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} />
-            </MapSearchBox>
-            <div id="map" style={{ width: '100%', height: '100%' }}></div>
-        </MapSection>
+    return (
+        <div className="root-wrapper">
+            <style>{`
+                /* 기본 스타일 */
+                * { box-sizing: border-box; }
+                ::-webkit-scrollbar { width: 6px; }
+                ::-webkit-scrollbar-track { background: transparent; }
+                ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+                ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
 
-        {/* 2. 여행 일정 영역 */}
-        <ScheduleSection>
-          {sortedDays.length > 0 ? (
-            sortedDays.map((day) => (
-              <DayCard key={day}>
-                <DayHeader>{day}</DayHeader>
-                {myItinerary[day].map((item: any, idx: number) => (
-                  <PlaceItem key={idx}>
-                    <OrderBadge>{idx + 1}</OrderBadge>
-                    <PlaceInfo>
-                        <PlaceName>{typeof item === 'string' ? item : item.place_name}</PlaceName>
-                        <PlaceDesc>상세 정보</PlaceDesc>
-                    </PlaceInfo>
-                    <EditButton><Trash2 size={16} /></EditButton>
-                  </PlaceItem>
-                ))}
-              </DayCard>
-            ))
-          ) : (<div style={{ padding: "20px", textAlign: 'center', color: "#888" }}>일정이 없습니다.</div>)}
-        </ScheduleSection>
+                .root-wrapper {
+                    height: 100vh;
+                    min-height: 800px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
 
-        {/* 3. 추천 여행지 및 로그 영역 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* 추천 여행지 */}
-            <RecommendSection>
-                <SectionTitle><MapPin size={20} color="#667eea" />✨ 추천 여행지</SectionTitle>
-                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {tripData.alternatives && tripData.alternatives.length > 0 ? (
-                        tripData.alternatives.map((placeName, idx) => (
-                            <RecommendItem key={idx}>
-                                <RecommendInfo><h4>{placeName}</h4></RecommendInfo>
-                                <AddButton><Plus size={14} /></AddButton>
-                            </RecommendItem>
-                        ))
-                    ) : (<p style={{ color: '#888', fontSize: '0.9rem' }}>추천 장소 없음</p>)}
-                </div>
-            </RecommendSection>
+                .main-container {
+                    width: 100%;
+                    max-width: 1800px;
+                    margin: 0 auto;
+                    height: 100%;
+                    display: grid;
+                    grid-template-columns: 2fr 1fr 1fr; 
+                    grid-template-rows: 7fr 3fr; 
+                    gap: 15px;
+                }
 
-            {/* 로그 기록 (신규 추가) */}
-            <LogSection>
-                <SectionTitle><FileText size={20} color="#667eea" />📝 수정 기록</SectionTitle>
-                {logs.length > 0 ? (
-                    logs.map((log) => (
-                        <LogItem key={log.action_id}>
-                            <span className="time">{new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                            <div>
-                                <span className="user">{log.user_name}</span>님이 {log.description}
+                .map-card { grid-column: 1 / 2; grid-row: 1 / 3; height: 100%; }
+                .detail-card { grid-column: 2 / 3; grid-row: 1 / 2; height: 100%; }
+                .right-section { grid-column: 3 / 4; grid-row: 1 / 2; height: 100%; }
+                .log-section { grid-column: 2 / 4; grid-row: 2 / 3; height: 100%; }
+
+                @media (max-width: 1200px) {
+                    .root-wrapper { height: auto; overflow-y: auto; }
+                    .main-container { display: flex; flex-direction: column; height: auto; }
+                    .map-card { height: 500px; flex: none; }
+                    .detail-card { height: 300px; flex: none; }
+                    .right-section { height: 300px; flex: none; }
+                    .log-section { height: 200px; flex: none; }
+                }
+
+                .white-box {
+                    background: white;
+                    border-radius: 15px;
+                    padding: 15px;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+
+                .rec-card:hover { transform: translateX(3px); border-color: #667eea; }
+                .point-delete-btn { padding: 6px; background: transparent; border: none; border-radius: 4px; color: #cbd5e0; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+                .point-delete-btn:hover { color: #e53e3e; background: #fee; }
+
+                /* 검색창 스타일 */
+                .map-search-box {
+                    position: absolute;
+                    top: 15px;
+                    left: 15px;
+                    z-index: 100;
+                    background: white;
+                    padding: 8px 12px;
+                    border-radius: 25px;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+                    display: flex;
+                    align-items: center;
+                    width: 280px;
+                    border: 1px solid #e2e8f0;
+                    transition: all 0.2s;
+                }
+                .map-search-box:focus-within {
+                    width: 320px;
+                    border-color: #667eea;
+                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+                }
+                .search-input {
+                    border: none;
+                    outline: none;
+                    flex: 1;
+                    font-size: 14px;
+                    margin-left: 8px;
+                    color: #2d3748;
+                }
+                .search-input::placeholder { color: #a0aec0; }
+                .search-btn {
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    padding: 4px;
+                    display: flex;
+                    align-items: center;
+                    color: #667eea;
+                    border-radius: 50%;
+                }
+                .search-btn:hover { background: #f7fafc; }
+            `}</style>
+
+            <div className="main-container">
+
+                {/* [1] 지도 카드 */}
+                <div className="white-box map-card">
+                    <div style={styles.cardHeader}>
+                        <div style={styles.tripBadge}>편집 중</div>
+                        
+                        {/* 헤더 내용을 가로로 배치 */}
+                        <div style={styles.headerRow}>
+                            {/* 왼쪽: 제목 */}
+                            <div style={styles.tripLocation}>
+                                <MapIcon size={24} color="#667eea" />
+                                <span style={{ fontSize: '20px' }}>{currentActiveFolder?.title}</span>
                             </div>
-                        </LogItem>
-                    ))
-                ) : (
-                    <div style={{ textAlign: 'center', color: '#a0aec0', fontSize: '13px', padding: '20px' }}>
-                        변경 이력이 없습니다.
-                    </div>
-                )}
-            </LogSection>
-        </div>
 
-      </ContentGrid>
-    </PageContainer>
-  );
+                            {/* 오른쪽: 공유 코드 + 참여자 수 */}
+                            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                                
+                                {/* ★ [추가] 공유 코드 버튼 */}
+                                <button 
+                                    onClick={handleCopyCode} 
+                                    style={styles.shareCodeBtn}
+                                    title="클릭하여 초대 코드 복사"
+                                >
+                                    <Share2 size={14} />
+                                    <span>초대 코드: {shareCode}</span>
+                                </button>
+
+                                <div style={styles.participantBadge}>
+                                    <Users size={16} />
+                                    <span>{currentActiveFolder?.participants}명</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style={styles.mapContainer}>
+                        {/* 지도 위 검색창 */}
+                        <form onSubmit={handleSearch} className="map-search-box">
+                            <Search size={18} color="#718096" />
+                            <input
+                                type="text"
+                                className="search-input"
+                                placeholder="장소 검색 (예: 제주공항)"
+                                value={searchKeyword}
+                                onChange={(e) => setSearchKeyword(e.target.value)}
+                            />
+                            <button type="submit" className="search-btn">
+                                <Search size={16} />
+                            </button>
+                        </form>
+
+                        <div id="map" style={{ width: '100%', height: '100%' }}></div>
+                        <div style={styles.mapOverlayHint}>
+                            지도를 클릭해 경로를 추가하세요 📍
+                        </div>
+                    </div>
+                </div>
+
+                {/* [2] 상세 경로 리스트 */}
+                <div className="white-box detail-card">
+                    <div style={styles.detailHeader}>
+                        <h4 style={styles.detailTitleText}>
+                            {selectedFolderId ? `📂 ${currentActiveFolder?.title} 경로` : "📂 선택된 여행 없음"}
+                        </h4>
+                        {selectedFolderId && (
+                            <button 
+                                style={styles.saveButton} 
+                                onClick={handleSave}
+                                title="여행 경로 저장하기"
+                            >
+                                <Save size={14} />
+                                <span>저장</span>
+                            </button>
+                        )}
+                    </div>
+                    
+                    <div style={styles.scrollableList}>
+                        {!selectedFolderId ? (
+                            <div style={styles.emptyState}>오류: 선택된 여행 폴더가 없습니다.</div>
+                        ) : currentActiveFolder?.points.length === 0 ? (
+                            <div style={styles.emptyState}>
+                                아직 추가된 장소가 없습니다.<br />
+                                지도를 클릭하거나 추천 여행지를 담아보세요!
+                            </div>
+                        ) : (
+                            currentActiveFolder?.points.map((point, idx) => (
+                                <div key={idx} style={styles.detailItem}>
+                                    <div style={styles.detailIndex}>{idx + 1}</div>
+                                    <div style={{ ...styles.detailAddress, flex: 1 }}>{point.address}</div>
+                                    <button
+                                        className="point-delete-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (selectedFolderId) {
+                                                deletePoint(selectedFolderId, idx);
+                                            }
+                                        }}
+                                        title="삭제"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* [3] 추천 여행지 */}
+                <div className="white-box right-section">
+                    <div style={styles.sectionHeader}>
+                        <h2 style={styles.sectionTitle}>
+                            <MapPin size={24} color="#667eea" />
+                            추천 여행지
+                        </h2>
+                    </div>
+                    <div style={styles.scrollableList}>
+                        {recommendations.map((rec) => {
+                            const isAdded = currentActiveFolder?.points.some(p => p.sourceId === rec.id);
+
+                            return (
+                                <div key={rec.id} className="rec-card" style={styles.recommendationCard}>
+                                    <div style={styles.recInfo}><Info size={16} color="#667eea" /></div>
+                                    <div style={styles.recContent}>
+                                        <h4 style={styles.recTitle}>{rec.title}</h4>
+                                        <p style={styles.recDescription}>{rec.description}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => toggleRecommendation(rec)}
+                                        style={{
+                                            ...styles.actionButton,
+                                            background: isAdded ? '#fff5f5' : '#f3f0ff',
+                                            color: isAdded ? '#e53e3e' : '#667eea',
+                                            border: isAdded ? '1px solid #feb2b2' : '1px solid #d6bcfa'
+                                        }}
+                                    >
+                                        {isAdded ? <Minus size={12} /> : <Plus size={12} />}
+                                        <span style={{ marginLeft: '4px' }}>{isAdded ? '빼기' : '담기'}</span>
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* [4] 로그 기록 공간 */}
+                <div className="white-box log-section">
+                    <div style={styles.sectionHeader}>
+                        <h2 style={styles.sectionTitle}>
+                            <FileText size={24} color="#667eea" />
+                            로그 기록
+                        </h2>
+                    </div>
+                    <div style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#a0aec0',
+                        fontSize: '13px',
+                        background: '#f7fafc',
+                        borderRadius: '10px',
+                        border: '1px dashed #cbd5e0'
+                    }}>
+                        여기에 로그 기록 UI가 추가될 예정입니다.
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
 }
+
+const styles = {
+    mapContainer: {
+        flex: 1,
+        width: '100%',
+        position: 'relative' as const,
+        borderRadius: '10px',
+        overflow: 'hidden',
+        border: '1px solid #e2e8f0'
+    },
+    scrollableList: {
+        flex: 1,
+        overflowY: 'auto' as const,
+        paddingRight: '5px',
+        display: 'flex',
+        flexDirection: 'column' as const,
+        gap: '8px'
+    },
+    cardHeader: { marginBottom: '10px' },
+    tripBadge: { display: 'inline-block', background: '#667eea', color: 'white', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', marginBottom: '5px' },
+    headerRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+    tripLocation: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '20px', fontWeight: '700', color: '#2d3748' },
+    participantBadge: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: '#4a5568', background: '#f7fafc', padding: '4px 10px', borderRadius: '15px' },
+    mapOverlayHint: { position: 'absolute' as const, bottom: '20px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 20px', borderRadius: '20px', fontSize: '14px', zIndex: 10, whiteSpace: 'nowrap' as const },
+    
+    // 상세 경로 헤더
+    detailHeader: { 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '8px',
+        borderBottom: '2px solid #f7fafc', 
+        paddingBottom: '6px' 
+    },
+    detailTitleText: { margin: 0, color: '#2d3748', fontSize: '15px' },
+    // 저장 버튼
+    saveButton: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '5px',
+        background: '#667eea',
+        color: 'white',
+        border: 'none',
+        padding: '5px 12px',
+        borderRadius: '8px',
+        fontSize: '13px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        transition: 'background 0.2s',
+    },
+    // ★ [추가] 공유 코드 버튼 스타일
+    shareCodeBtn: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '5px',
+        background: '#f0f4ff', // 연한 파란색 배경
+        color: '#667eea',
+        border: '1px solid #dbeafe',
+        padding: '4px 10px',
+        borderRadius: '15px',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+        whiteSpace: 'nowrap' as const,
+    },
+
+    detailItem: { display: 'flex', alignItems: 'center', gap: '10px', background: '#f7fafc', padding: '8px', borderRadius: '8px', fontSize: '13px' },
+    detailIndex: { width: '20px', height: '20px', background: '#667eea', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 },
+    detailAddress: { fontSize: '13px', color: '#4a5568' },
+    emptyState: { textAlign: 'center' as const, color: '#a0aec0', marginTop: '10px', fontSize: '13px', lineHeight: '1.6' },
+    sectionHeader: { marginBottom: '15px', borderBottom: '1px solid #edf2f7', paddingBottom: '10px' },
+    sectionTitle: { fontSize: '18px', fontWeight: '700', color: '#2d3748', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 },
+    recommendationCard: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '10px', minHeight: 'auto', background: 'white' },
+    recInfo: { color: '#667eea' },
+    recContent: { flex: 1 },
+    recTitle: { fontSize: '14px', fontWeight: '600', margin: '0 0 2px 0' },
+    recDescription: { fontSize: '11px', color: '#718096', margin: 0 },
+    actionButton: { display: 'flex', alignItems: 'center', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' as const },
+} as const;
