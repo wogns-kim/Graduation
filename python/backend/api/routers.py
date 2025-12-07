@@ -7,4 +7,4 @@ api_router = APIRouter()
 
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(trips.router, prefix="/trips", tags=["Trips"])
-api_router.include_router(recommend.router, prefix="/recommend", tags=["Recommendations"])
+api_router.include_router(recommend.router, prefix="/recommendations", tags=["Recommendations"])
