@@ -4,10 +4,13 @@
 
 -- 1. 'first_trip' 데이터베이스 생성
 CREATE DATABASE IF NOT EXISTS first_trip
+
 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- 2. 데이터베이스 사용
 USE first_trip;
+
+
 
 -- 3. 테이블 생성
 

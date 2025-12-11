@@ -9,19 +9,19 @@ import TravelRoutePage from "./components/MyPage/TravelRoutePage";
 import Taste from "./components/Select your taste/select_your_taste";
 import Header from './components/Header/Header';
 import KakaoCallback from './components/kakaoCallback/kakaoCallback';
-import CodeInputModal from './components/CodeInputModal'; 
+import CodeInputModal from './components/CodeInputModal';
 
 // --- HeaderLayout 컴포넌트 정의 ---
 interface HeaderLayoutProps {
   isLoggedIn: boolean;
   onLogoutClick: () => void;
-  onCodeClick: () => void; 
+  onCodeClick: () => void;
 }
 
 const HeaderLayout = ({ isLoggedIn, onLogoutClick, onCodeClick }: HeaderLayoutProps) => {
   return (
     <>
-      <Header 
+      <Header
         isLoggedIn={isLoggedIn}
         onLogoutClick={onLogoutClick}
         onCodeClick={onCodeClick}
@@ -36,7 +36,7 @@ function AppContent() {
 
   // 1. [수정] 토큰 키 이름을 'access_token'으로 통일
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("access_token"));
-  
+
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
 
   const handleLogout = () => {
@@ -51,10 +51,10 @@ function AppContent() {
 
   const handleJoinGroup = (code: string) => {
     console.log("입력된 초대 코드:", code);
-    navigate(`/travel-route/${code}`); 
+    navigate(`/travel-route/${code}`);
     closeCodeModal();
   };
-  
+
   // 카카오 로그인 처리 로직
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -65,21 +65,26 @@ function AppContent() {
 
         // 2. 토큰 저장 및 키 이름 통일
         if (event.data.token) {
-           localStorage.setItem("access_token", event.data.token);
+          localStorage.setItem("access_token", event.data.token);
         }
-        
+
         setIsLoggedIn(true);
-        
+
         // 3. 백엔드의 지시(nextAction)에 따라 이동
         if (event.data.nextAction) {
-            navigate(event.data.nextAction);
+          navigate(event.data.nextAction);
         } else {
-            navigate('/');
+          navigate('/');
         }
       }
 
       if (event.data.type === "KAKAO_LOGIN_FAIL") {
-        alert("로그인에 실패했습니다.");
+        // 전달받은 에러 내용을 콘솔에 출력 (F12에서 확인 가능)
+        console.error("▼▼▼ 로그인 실패 상세 에러 ▼▼▼");
+        console.error(event.data.error); 
+        
+        // 화면에도 띄워줌
+        alert(`로그인에 실패했습니다.\n사유: ${event.data.error}`);
       }
     };
 
@@ -91,10 +96,10 @@ function AppContent() {
     <>
       <Routes>
         <Route element={
-          <HeaderLayout 
-            isLoggedIn={isLoggedIn} 
-            onLogoutClick={handleLogout} 
-            onCodeClick={openCodeModal} 
+          <HeaderLayout
+            isLoggedIn={isLoggedIn}
+            onLogoutClick={handleLogout}
+            onCodeClick={openCodeModal}
           />
         }>
           <Route path="/" element={<HomePage />} />
@@ -106,10 +111,10 @@ function AppContent() {
         <Route path="/auth/kakao/callback" element={<KakaoCallback />} />
       </Routes>
 
-      <CodeInputModal 
-        isOpen={isCodeModalOpen} 
-        onClose={closeCodeModal} 
-        onJoin={handleJoinGroup} 
+      <CodeInputModal
+        isOpen={isCodeModalOpen}
+        onClose={closeCodeModal}
+        onJoin={handleJoinGroup}
       />
     </>
   );
