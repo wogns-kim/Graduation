@@ -1,19 +1,24 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from "react";
 import styled from "@emotion/styled";
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { MapPin, Info, Trash2, Users, Plus, Minus, FileText, Search, Save, Share2, Clock } from "lucide-react";
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult, DroppableProvided, DraggableProvided } from '@hello-pangea/dnd';
+
+import { MapPin, Info, Trash2, Map as MapIcon, Users, Plus, Minus, FileText, Search, Save, Share2, GripVertical } from "lucide-react";
+
 
 // --- 타입 정의 ---
 declare global {
-    interface Window {
-        kakao: any;
-    }
-    interface ImportMetaEnv {
-        readonly VITE_KAKAO_JAVASCRIPT_KEY: string;
-    }
-    interface ImportMeta {
-        readonly env: ImportMetaEnv;
-    }
+    interface Window {
+        kakao: any;
+    }
+    interface ImportMetaEnv {
+        readonly VITE_KAKAO_JAVASCRIPT_KEY: string;
+        readonly VITE_BACKEND_API_URL: string;
+    }
+    interface ImportMeta {
+        readonly env: ImportMetaEnv;
+    }
 }
 
 interface ItineraryItem {
@@ -30,12 +35,13 @@ interface UserSimple {
 }
 
 interface TripDetails {
-  trip_name: string;
-  participants: UserSimple[];
-  itineraries: Record<string, ItineraryItem[]>; // { "DAY 1": [], "DAY 2": [] }
-  alternatives?: string[]; 
-  isAiResult?: boolean;
-  shareCode?: string; // 공유 코드
+  trip_name: string;
+  participants: UserSimple[];
+  itineraries: Record<string, ItineraryItem[]>;
+  alternatives?: string[]; 
+  isAiResult?: boolean;
+  shareCode?: string;
+  trip_id?: number;
 }
 
 interface TripLog {
@@ -45,6 +51,10 @@ interface TripLog {
     description: string;
     created_at: string;
 }
+
+interface TripPoint { lat: number; lng: number; address: string; title?: string; sourceId?: number; order?: number; }
+interface TripFolder { id: number; title: string; participants: number; points: TripPoint[]; }
+interface Recommendation { id: number; title: string; description: string; lat: number; lng: number; }
 
 // --- 스타일 컴포넌트 ---
 const PageContainer = styled.div`
@@ -300,8 +310,13 @@ export default function TravelRoutePage() {
   const [logs, setLogs] = useState<TripLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 공유 코드 (초기값은 랜덤, DB에서 가져오면 덮어씌움)
-  const [shareCode, setShareCode] = useState(Math.random().toString(36).substring(2, 8).toUpperCase());
+  // 지도 및 UI 제어용 상태
+  const [travelFolders, setTravelFolders] = useState<TripFolder[]>([]);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [shareCode, setShareCode] = useState(Math.random().toString(36).substring(2, 8).toUpperCase());
 
   // 지도 Refs
   const mapRef = useRef<any>(null);
@@ -313,92 +328,146 @@ export default function TravelRoutePage() {
 
   // --- 1. 백엔드 데이터 불러오기 ---
   useEffect(() => {
-    const fetchTripDetails = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        alert("로그인이 필요합니다.");
-        navigate("/");
-        return;
-      }
+    const fetchTripDetails = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        alert("로그인이 필요합니다.");
+        navigate("/");
+        return;
+      }
+      
+      try {
+        let tripName = "";
+        let participantsCount = 1;
+        let routePlaceNames: string[] = [];
+        let altPlaceNames: string[] = [];
+        let tripId = 0;
+        let currentItineraries: Record<string, ItineraryItem[]> = {};
 
-      const API_BASE = "http://127.0.0.1:8000/api";
-      
-      try {
-        if (cityId === 'ai-result') {
-            // A. AI 추천 모드
-            const startDate = searchParams.get('start');
-            const endDate = searchParams.get('end');
-            
-            const response = await fetch(`${API_BASE}/recommendations?start_date=${startDate}&end_date=${endDate}`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error("AI 추천 로드 실패");
-            const data = await response.json();
-            const firstCourse = data[0]; // 첫 번째 추천 결과 사용
-            
-            setTripData({
-                trip_name: firstCourse.theme || "AI 추천 여행 코스",
-                participants: [], // AI 결과는 아직 참여자 없음
-                itineraries: firstCourse.route, // { "DAY 1": ["장소1", "장소2"] }
-                alternatives: firstCourse.alternatives || [],
-                isAiResult: true,
-                shareCode: shareCode // 임시 코드 유지
-            });
-        } 
-        else {
-            // B. 저장된 여행 조회 모드
-            const response = await fetch(`${API_BASE}/trips/${cityId}/details`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error("여행 정보 로드 실패");
-            const data = await response.json();
-            
-            // DB 데이터 가공 (첫 번째 사용자의 일정만 보여주는 예시)
-            const firstUserId = Object.keys(data.itineraries)[0];
-            const myItineraryItems = data.itineraries[firstUserId] || [];
-            
-            // 리스트를 { "DAY 1": [...] } 형태로 변환
-            const groupedItinerary: Record<string, ItineraryItem[]> = {};
-            // (백엔드 스키마에 따라 다르지만, 여기서는 배열로 가정하고 변환 로직 추가)
-            if (Array.isArray(myItineraryItems)) {
-                 // visit_day_str 기준으로 그룹화 필요 (백엔드에서 이미 그룹화해줬다면 생략 가능)
-                 // 임시로 'DAY 1'에 다 넣는 예시 (실제 백엔드 응답 구조 확인 필요)
-                 groupedItinerary["DAY 1"] = myItineraryItems; 
-            } else {
-                 // 이미 그룹화된 딕셔너리라면 그대로 사용
-                 Object.assign(groupedItinerary, myItineraryItems);
-            }
+        if (cityId === 'ai-result') {
+            const startDate = searchParams.get('start');
+            const endDate = searchParams.get('end');
+            
+            const response = await fetch(`${API_BASE}/recommendations?start_date=${startDate}&end_date=${endDate}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
 
-            setTripData({
-                trip_name: data.trip_name,
-                participants: data.participants,
-                itineraries: groupedItinerary,
-                isAiResult: false,
-                shareCode: data.shareable_link_id || shareCode
-            });
-            
-            // 실제 공유 코드 업데이트
-            if (data.shareable_link_id) setShareCode(data.shareable_link_id);
+            if (!response.ok) throw new Error("AI 추천 로드 실패");
+            const data = await response.json();
+            const firstCourse = data[0]; 
+            
+            tripName = firstCourse.theme || "AI 추천 여행 코스";
+            tripId = 999;
+            if (firstCourse.alternatives) altPlaceNames = firstCourse.alternatives;
+            
+            if (firstCourse.route) {
+                Object.entries(firstCourse.route).forEach(([day, places]) => {
+                    const placeList = Array.isArray(places) ? places : [];
+                    currentItineraries[day] = placeList.map((placeName: string, idx: number) => ({
+                        item_id: Date.now() + idx, // 임시 ID
+                        place_name: placeName,
+                        order_in_day: idx + 1
+                    }));
+                    routePlaceNames.push(...placeList);
+                });
+            }
 
-            // 로그 조회
-            const historyRes = await fetch(`${API_BASE}/trips/${cityId}/history`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (historyRes.ok) setLogs(await historyRes.json());
-        }
-      } catch (error) {
-        console.error(error);
-        alert("데이터를 불러올 수 없습니다.");
-        navigate("/mypage");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    if (cityId) fetchTripDetails();
-  }, [cityId, navigate, searchParams]);
+            setTripData({
+                trip_name: tripName,
+                participants: [],
+                itineraries: currentItineraries,
+                alternatives: altPlaceNames,
+                isAiResult: true,
+                shareCode: shareCode
+            });
+
+        } else {
+            const response = await fetch(`${API_BASE}/trips/${cityId}/details`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error("여행 정보 로드 실패");
+            const data = await response.json();
+            
+            tripName = data.trip_name;
+            participantsCount = data.participants.length;
+            tripId = Number(cityId);
+
+            const firstUserId = Object.keys(data.itineraries)[0];
+            const myItinerary = data.itineraries[firstUserId] || {};
+            
+            if (Array.isArray(myItinerary)) {
+                 currentItineraries["DAY 1"] = myItinerary;
+                 myItinerary.forEach((item: any) => routePlaceNames.push(item.place_name));
+            } else {
+                 Object.assign(currentItineraries, myItinerary);
+                 Object.values(myItinerary).forEach((items: any) => {
+                     items.forEach((item: any) => routePlaceNames.push(item.place_name));
+                 });
+            }
+
+            setTripData({
+                trip_name: tripName,
+                participants: data.participants,
+                itineraries: currentItineraries,
+                isAiResult: false,
+                shareCode: data.shareable_link_id,
+                trip_id: tripId
+            });
+            if(data.shareable_link_id) setShareCode(data.shareable_link_id);
+
+            const historyRes = await fetch(`${API_BASE}/trips/${cityId}/history`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (historyRes.ok) setLogs(await historyRes.json());
+        }
+
+        // --- 좌표 검색 (Geocoding) ---
+        const waitForKakao = setInterval(() => {
+            if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
+                clearInterval(waitForKakao);
+                const ps = new window.kakao.maps.services.Places();
+
+                const searchPlace = (keyword: string): Promise<any> => {
+                    return new Promise((resolve) => {
+                        ps.keywordSearch(keyword, (result: any, status: any) => {
+                            if (status === window.kakao.maps.services.Status.OK) {
+                                resolve({ title: keyword, lat: parseFloat(result[0].y), lng: parseFloat(result[0].x), address: result[0].address_name });
+                            } else { resolve(null); }
+                        });
+                    });
+                };
+
+                Promise.all(routePlaceNames.map(name => searchPlace(name))).then(pointResults => {
+                     const validPoints = pointResults.filter(p => p !== null).map((p, i) => ({ ...p, sourceId: i }));
+                     setTravelFolders([{
+                        id: tripId, title: tripName, participants: participantsCount, points: validPoints
+                    }]);
+                    setSelectedFolderId(tripId);
+                });
+
+                Promise.all(altPlaceNames.map(name => searchPlace(name))).then(recResults => {
+                     const validRecs = recResults.filter(r => r !== null).map((r, i) => ({
+                        id: i + 1000, title: r.title, description: "추천 대안 장소", lat: r.lat, lng: r.lng
+                    }));
+                     setRecommendations(validRecs);
+                });
+            }
+        }, 500);
+
+      } catch (error: any) {
+        console.error(error);
+        alert(`오류: ${error.message}`);
+        navigate("/mypage");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (cityId) fetchTripDetails();
+  }, [cityId, navigate, searchParams]);
 
 
-  // --- 2. 지도 그리기 ---
+  // --- 2. 지도 그리기 ---
   useEffect(() => {
     // 로딩 중이거나 데이터가 없으면 중단
     if (isLoading || !tripData) return;
@@ -408,7 +477,6 @@ export default function TravelRoutePage() {
     
     const loadKakaoMap = () => {
         if (!window.kakao || !window.kakao.maps) return;
-
         window.kakao.maps.load(() => {
             const container = document.getElementById('map');
             if (!container) return;
@@ -535,23 +603,141 @@ export default function TravelRoutePage() {
   }, [tripData, isLoading]); // tripData가 변경될 때마다 실행
 
 
-  // --- 핸들러 ---
-  const handleSave = () => {
-    // 실제 저장 로직 구현 필요 (백엔드 POST /api/trips 호출)
-    alert(`'${tripData?.trip_name}' 코스를 저장합니다! (구현 예정)`);
-    // 성공 시 로그 갱신 로직 추가
+  // --- 핸들러 구현 ---
+
+  // 1. 저장 핸들러 (AI 결과를 DB에 저장)
+  const handleSaveTrip = async () => {
+    if (!tripData) return;
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    try {
+        // 1-1. 여행 생성
+        const createRes = await fetch(`${API_BASE}/trips/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ trip_name: tripData.trip_name })
+        });
+        if (!createRes.ok) throw new Error("여행 생성 실패");
+        const newTrip = await createRes.json();
+        const newTripId = newTrip.trip_id;
+
+        // 1-2. 일정 항목 추가 (개념적 구현 - 실제로는 place_id가 필요함)
+        // 여기서는 저장 후 해당 페이지로 이동만 처리
+        alert(`'${tripData.trip_name}' 여행이 저장되었습니다! (ID: ${newTripId})`);
+        navigate(`/travel-route/${newTripId}`);
+
+    } catch (error) {
+        console.error(error);
+        alert("저장 중 오류가 발생했습니다.");
+    }
+  };
+
+  // 2. 장소 추가 (UI 업데이트 + 백엔드 요청)
+  const handleAddPlace = async (placeName: string) => {
+    if (!tripData) return;
+    
+    const firstDayKey = Object.keys(tripData.itineraries).sort()[0] || "DAY 1";
+    const currentItems = tripData.itineraries[firstDayKey] || [];
+    const newOrder = currentItems.length + 1;
+    
+    // UI 즉시 반영
+    const newItem: ItineraryItem = { 
+        item_id: Date.now(), 
+        place_name: placeName, 
+        order_in_day: newOrder 
+    };
+
+    setTripData(prev => prev ? ({
+        ...prev,
+        itineraries: {
+            ...prev.itineraries,
+            [firstDayKey]: [...currentItems, newItem]
+        }
+    }) : null);
+
+    if (!tripData.isAiResult && tripData.trip_id) {
+        const token = localStorage.getItem("access_token");
+        try {
+            await fetch(`${API_BASE}/trips/${tripData.trip_id}/items`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ place_id: 1, visit_day_str: firstDayKey, order_in_day: newOrder })
+            });
+        } catch (e) { console.error(e); }
+    }
+    alert(`'${placeName}'을(를) 추가했습니다.`);
+  };
+
+  // 3. 장소 삭제
+  const deletePoint = async (day: string, idx: number, item: ItineraryItem) => {
+    if (!window.confirm("정말 삭제하시겠습니까?")) return;
+
+    setTripData(prev => {
+        if (!prev) return null;
+        const newItems = prev.itineraries[day].filter((_, i) => i !== idx);
+        return { ...prev, itineraries: { ...prev.itineraries, [day]: newItems } };
+    });
+
+    if (!tripData?.isAiResult && item.item_id && tripData?.trip_id) {
+        const token = localStorage.getItem("access_token");
+        try {
+             await fetch(`${API_BASE}/items/${item.item_id}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+        } catch (e) { console.error(e); }
+    }
+  };
+  
+  // 4. 드래그 앤 드롭 순서 변경 (HandleDragEnd)
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination || !tripData) return;
+    const { source, destination } = result;
+
+    if (source.droppableId === destination.droppableId) {
+        const day = source.droppableId;
+        const items = Array.from(tripData.itineraries[day]);
+        const [moved] = items.splice(source.index, 1);
+        items.splice(destination.index, 0, moved);
+
+        setTripData(prev => prev ? ({
+            ...prev,
+            itineraries: { ...prev.itineraries, [day]: items }
+        }) : null);
+
+        if (!tripData.isAiResult && tripData.trip_id) {
+            const token = localStorage.getItem("access_token");
+            const orderedIds = items.map(i => i.item_id); 
+            try {
+                await fetch(`${API_BASE}/trips/${tripData.trip_id}/items/reorder`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                    body: JSON.stringify({ visit_day_str: day, ordered_item_ids: orderedIds })
+                });
+            } catch (e) { console.error(e); }
+        }
+    }
   };
 
   const handleCopyCode = () => {
-      navigator.clipboard.writeText(shareCode);
-      alert(`초대 코드 [${shareCode}]가 복사되었습니다!`);
+    navigator.clipboard.writeText(shareCode);
+    alert("초대 코드 복사 완료!");
   };
 
-  const handleAddPlace = (placeName: string) => {
-      alert(`'${placeName}'을(를) 일정에 추가합니다. (구현 예정)`);
-      // 1. 백엔드 API 호출 (POST /api/trips/{id}/items)
-      // 2. 성공 시 tripData 업데이트 (화면 갱신)
-      // 3. 로그 업데이트
+  const handleMapSearch = (e: React.FormEvent) => { 
+      e.preventDefault();
+      if (!searchKeyword.trim() || !psRef.current) return;
+      psRef.current.keywordSearch(searchKeyword, (data: any, status: any) => {
+          if (status === window.kakao.maps.services.Status.OK) {
+              const place = data[0];
+              mapRef.current.panTo(new window.kakao.maps.LatLng(place.y, place.x));
+          } else { alert("검색 결과 없음"); }
+      });
+  };
+
+  const toggleRecommendation = (rec: any) => {
+    alert("추가 (구현 예정)");
   };
 
   if (isLoading) return <div style={{textAlign:'center', padding:'100px'}}>로딩 중...</div>;
@@ -561,7 +747,7 @@ export default function TravelRoutePage() {
     <PageContainer>
       <HeaderSection>
         <Title>{tripData.trip_name}</Title>
-        {tripData.isAiResult && <SaveButton onClick={handleSave}><Save size={16}/> 저장</SaveButton>}
+        {tripData.isAiResult && <SaveButton onClick={handleSaveTrip}><Save size={16}/> 저장</SaveButton>}
       </HeaderSection>
       
       <ContentGrid>
