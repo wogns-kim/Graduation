@@ -138,15 +138,18 @@ def join_trip(
     
     return {"message": f"'{trip.trip_name}' 여행에 성공적으로 참여했습니다."}
 
-@router.get("/{shareable_link_id}/details", response_model=schemas.TripDetailsResponse)
+# ★ [수정됨] shareable_link_id(문자열) 대신 trip_id(숫자)로 조회하도록 변경
+@router.get("/{trip_id}/details", response_model=schemas.TripDetailsResponse)
 def get_trip_details(
-    shareable_link_id: str, 
+    trip_id: int, 
     db: Session = Depends(database.get_db)
 ):
     """
     특정 여행 계획의 상세 정보(참여자, 날짜별 일정 등)를 모두 조회합니다.
     """
-    trip = db.query(models.Trip).filter(models.Trip.shareable_link_id == shareable_link_id).first()
+    # 1. trip_id로 조회 변경
+    trip = db.query(models.Trip).filter(models.Trip.trip_id == trip_id).first()
+    
     if not trip:
         raise HTTPException(status_code=404, detail="여행 계획을 찾을 수 없습니다.")
 
@@ -188,7 +191,8 @@ def get_trip_details(
     return {
         "trip_name": trip.trip_name,
         "participants": participants,
-        "itineraries": itineraries_by_user_day
+        "itineraries": itineraries_by_user_day,
+        "shareable_link_id": trip.shareable_link_id  # 공유 링크 ID도 반환
     }
 
 

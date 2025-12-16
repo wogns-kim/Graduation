@@ -10,7 +10,7 @@ KAKAO_API_KEY = "8abfe377ab126ace7e541f101103470d"
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': '1234',
+    'password': '9047',
     'database': 'first_trip'
 }
 
