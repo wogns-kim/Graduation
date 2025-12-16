@@ -8,6 +8,12 @@ declare global {
     interface Window {
         kakao: any;
     }
+    interface ImportMetaEnv {
+        readonly VITE_KAKAO_JAVASCRIPT_KEY: string;
+    }
+    interface ImportMeta {
+        readonly env: ImportMetaEnv;
+    }
 }
 
 interface ItineraryItem {
@@ -42,11 +48,11 @@ interface TripLog {
 
 // --- 스타일 컴포넌트 ---
 const PageContainer = styled.div`
-  padding: 40px 20px;
-  max-width: 1600px; /* 넓은 화면 활용 */
-  margin: 0 auto;
-  background-color: #f8f9fa;
+  padding: 30px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 `;
 
 const HeaderSection = styled.div`
@@ -301,6 +307,9 @@ export default function TravelRoutePage() {
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
+  const psRef = useRef<any>(null);
+
+  const API_BASE = import.meta.env.VITE_BACKEND_API_URL || "http://127.0.0.1:8000/api";
 
   // --- 1. 백엔드 데이터 불러오기 ---
   useEffect(() => {
@@ -389,12 +398,17 @@ export default function TravelRoutePage() {
   }, [cityId, navigate, searchParams]);
 
 
-  // --- 2. 지도 그리기 (데이터가 준비되면 실행) ---
+  // --- 2. 지도 그리기 ---
   useEffect(() => {
+    // 로딩 중이거나 데이터가 없으면 중단
     if (isLoading || !tripData) return;
-
-    // 카카오맵 로드 함수
+    
+    // 카카오맵 키 (상수로 정의하거나 .env 사용)
+    const kakaoAppKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY;
+    
     const loadKakaoMap = () => {
+        if (!window.kakao || !window.kakao.maps) return;
+
         window.kakao.maps.load(() => {
             const container = document.getElementById('map');
             if (!container) return;
@@ -403,61 +417,95 @@ export default function TravelRoutePage() {
             if (!mapRef.current) {
                 const options = { center: new window.kakao.maps.LatLng(37.5665, 126.9780), level: 7 };
                 mapRef.current = new window.kakao.maps.Map(container, options);
+                psRef.current = new window.kakao.maps.services.Places();
             }
 
-            // 기존 마커 제거
+            // 기존 마커/라인 제거 (초기화)
             markersRef.current.forEach((m: any) => m.setMap(null));
             markersRef.current = [];
             if (polylineRef.current) polylineRef.current.setMap(null);
 
-            // 현재 표시할 장소들 수집
-            const placesToShow: string[] = [];
-            Object.values(tripData.itineraries).forEach(dayItems => {
-                // dayItems가 문자열 배열인지 객체 배열인지 확인
-                dayItems.forEach((item: any) => {
-                    const name = typeof item === 'string' ? item : item.place_name;
-                    if (name) placesToShow.push(name);
-                });
+            // --- 날짜 순서대로 정렬하여 장소 수집 ---
+            const allPlaceNames: string[] = [];
+            
+            // 1. 날짜 키(DAY 1, DAY 2...)를 가져와서 숫자 기준으로 정렬
+            const sortedDays = Object.keys(tripData.itineraries).sort((a, b) => {
+                const numA = parseInt(a.replace(/\D/g, '')) || 0; // "DAY 1" -> 1
+                const numB = parseInt(b.replace(/\D/g, '')) || 0;
+                return numA - numB;
             });
 
-            if (placesToShow.length === 0) return;
+            // 2. 정렬된 날짜 순서대로 장소 이름 수집
+            sortedDays.forEach(day => {
+                const items = tripData.itineraries[day];
+                // items가 배열인지 확인 후 순회
+                if (Array.isArray(items)) {
+                    items.forEach(item => {
+                        // item이 객체라면 place_name, 문자열이라면 그대로 사용
+                        const name = typeof item === 'string' ? item : item.place_name;
+                        if (name) allPlaceNames.push(name);
+                    });
+                }
+            });
 
-            // 장소 검색 및 마커 찍기
-            const ps = new window.kakao.maps.services.Places();
-            const bounds = new window.kakao.maps.LatLngBounds();
-            const linePath: any[] = [];
+            if (allPlaceNames.length === 0) return;
+            // ----------------------------------------------------
 
-            // 비동기로 좌표 검색
-            const searchPromises = placesToShow.map((placeName, idx) => {
-                return new Promise<void>((resolve) => {
-                    ps.keywordSearch(placeName, (data: any, status: any) => {
+            // 장소 이름으로 좌표 검색 (Promise.all로 병렬 처리)
+            // 주의: 검색 결과 순서가 섞이지 않도록 map을 사용
+            const searchPromises = allPlaceNames.map((name) => {
+                return new Promise<any>((resolve) => {
+                    psRef.current.keywordSearch(name, (data: any, status: any) => {
                         if (status === window.kakao.maps.services.Status.OK) {
-                            const coords = new window.kakao.maps.LatLng(data[0].y, data[0].x);
-                            
-                            // 마커 생성 (순서 번호 포함)
-                            const content = `<div style="padding:5px; background:white; border:1px solid #333; border-radius:5px; font-size:12px; font-weight:bold;">${idx + 1}. ${placeName}</div>`;
-                            const overlay = new window.kakao.maps.CustomOverlay({
-                                position: coords,
-                                content: content,
-                                map: mapRef.current,
-                                yAnchor: 1.5
+                            // 검색 성공 시 좌표 반환
+                            resolve({ 
+                                title: name, 
+                                lat: parseFloat(data[0].y), 
+                                lng: parseFloat(data[0].x) 
                             });
-                            
-                            markersRef.current.push(overlay);
-                            linePath.push(coords); // 선 연결용 좌표 저장
-                            bounds.extend(coords); // 지도 범위 조정용
+                        } else {
+                            // 검색 실패 시 null 반환 (하지만 순서는 유지됨)
+                            console.warn(`장소 검색 실패: ${name}`);
+                            resolve(null);
                         }
-                        resolve();
                     });
                 });
             });
 
-            // 모든 검색이 끝나면 선 그리고 범위 조정
-            Promise.all(searchPromises).then(() => {
+            Promise.all(searchPromises).then((results) => {
+                // null(검색 실패) 제외하고 유효한 장소만 필터링
+                const validPoints = results.filter((r) => r !== null);
+                
+                const linePath: any[] = [];
+                const bounds = new window.kakao.maps.LatLngBounds();
+
+                // 마커 및 선 그리기
+                validPoints.forEach((point, index) => {
+                    const position = new window.kakao.maps.LatLng(point.lat, point.lng);
+                    linePath.push(position);
+                    bounds.extend(position);
+
+                    // 커스텀 오버레이 (순서 번호 표시)
+                    const content = `
+                        <div style="position: relative; bottom: 45px;">
+                            <div style="background: white; padding: 5px 10px; border-radius: 15px; border: 1px solid #3B82F6; font-size: 12px; font-weight: bold; color: #3B82F6; box-shadow: 0 2px 4px rgba(0,0,0,0.2); white-space: nowrap;">${point.title}</div>
+                            <div style="position: absolute; left: 50%; bottom: -35px; transform: translateX(-50%); width: 24px; height: 24px; background: #3B82F6; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${index + 1}</div>
+                        </div>`;
+                    
+                    const overlay = new window.kakao.maps.CustomOverlay({
+                        position: position,
+                        content: content,
+                        map: mapRef.current,
+                        yAnchor: 1.5
+                    });
+                    markersRef.current.push(overlay);
+                });
+
+                // 경로 선(Polyline) 그리기
                 if (linePath.length > 1) {
                     const polyline = new window.kakao.maps.Polyline({
-                        path: linePath,
-                        strokeWeight: 4,
+                        path: linePath, // 정렬된 좌표 배열
+                        strokeWeight: 5,
                         strokeColor: '#3B82F6',
                         strokeOpacity: 0.8,
                         strokeStyle: 'solid'
@@ -465,6 +513,8 @@ export default function TravelRoutePage() {
                     polyline.setMap(mapRef.current);
                     polylineRef.current = polyline;
                 }
+
+                // 모든 마커가 보이도록 지도 범위 재설정
                 if (linePath.length > 0) {
                     mapRef.current.setBounds(bounds);
                 }
@@ -472,24 +522,45 @@ export default function TravelRoutePage() {
         });
     };
 
-    // 카카오 SDK 로드 체크
+    // SDK 로드 확인 및 스크립트 추가
     if (window.kakao && window.kakao.maps) {
         loadKakaoMap();
     } else {
         const script = document.createElement("script");
-        // 본인의 JavaScript 키 입력
-        script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=c0ce14306decee109a46f80f30e7c0df&libraries=services&autoload=false`;
+        script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&libraries=services&autoload=false`;
+        script.async = false;
         script.onload = loadKakaoMap;
         document.head.appendChild(script);
     }
-  }, [tripData, isLoading]);
+  }, [tripData, isLoading]); // tripData가 변경될 때마다 실행
 
 
   // --- 핸들러 ---
-  const handleSave = () => {
-    // 실제 저장 로직 구현 필요 (백엔드 POST /api/trips 호출)
-    alert(`'${tripData?.trip_name}' 코스를 저장합니다! (구현 예정)`);
-    // 성공 시 로그 갱신 로직 추가
+  const handleSave = async () => {
+    if (!tripData) return;
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    try {
+        // 1-1. 여행 생성
+        const createRes = await fetch(`${API_BASE}/trips/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ trip_name: tripData.trip_name })
+        });
+        if (!createRes.ok) throw new Error("여행 생성 실패");
+        const newTrip = await createRes.json();
+        const newTripId = newTrip.trip_id;
+
+        alert(`'${tripData.trip_name}' 여행이 저장되었습니다! (ID: ${newTripId})\n일정 항목은 추후 연동될 예정입니다.`);
+        
+        // TODO: 일정 항목 저장 로직 추가 (place_id 필요)
+        navigate(`/travel-route/${newTripId}`);
+
+    } catch (error) {
+        console.error(error);
+        alert("저장 중 오류가 발생했습니다.");
+    }
   };
 
   const handleCopyCode = () => {
@@ -497,11 +568,33 @@ export default function TravelRoutePage() {
       alert(`초대 코드 [${shareCode}]가 복사되었습니다!`);
   };
 
+  // 2. 추천 장소 추가 핸들러
   const handleAddPlace = (placeName: string) => {
-      alert(`'${placeName}'을(를) 일정에 추가합니다. (구현 예정)`);
-      // 1. 백엔드 API 호출 (POST /api/trips/{id}/items)
-      // 2. 성공 시 tripData 업데이트 (화면 갱신)
-      // 3. 로그 업데이트
+    if (!tripData) return;
+    
+    // UI상에서 즉시 추가 (첫 번째 날짜에 추가)
+    const firstDayKey = Object.keys(tripData.itineraries).sort()[0] || "DAY 1";
+    const newItems = [...(tripData.itineraries[firstDayKey] || [])];
+    
+    // 임시 아이템 생성
+    const newItem: ItineraryItem = {
+        item_id: Date.now(), // 임시 ID
+        place_name: placeName,
+        order_in_day: newItems.length + 1
+    };
+    newItems.push(newItem);
+
+    // 상태 업데이트
+    setTripData({
+        ...tripData,
+        itineraries: {
+            ...tripData.itineraries,
+            [firstDayKey]: newItems
+        }
+    });
+
+    // TODO: 백엔드 API 호출하여 DB에도 추가 (place_id 필요)
+    alert(`'${placeName}'이(가) ${firstDayKey} 일정에 추가되었습니다.`);
   };
 
   if (isLoading) return <div style={{textAlign:'center', padding:'100px'}}>로딩 중...</div>;
