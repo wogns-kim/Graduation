@@ -8,9 +8,10 @@ KAKAO_API_KEY = "8abfe377ab126ace7e541f101103470d"
 
 # --- 2. MySQL 접속 정보를 자신의 환경에 맞게 수정해주세요 ---
 db_config = {
-    'host': 'shortline.proxy.rlwy.net',
+    'host': 'shortline.proxy.rlwy.net',  # Railway 주소
+    'port': '20458',                       # 5자리 숫자 포트! (3306 아님)
     'user': 'root',
-    'password': '!j76684133',
+    'password': 'lNQLAqJxbgvYvDTfsJpbnCkTJPXckTIg',        # Railway 비밀번호
     'database': 'first_trip'
 }
 
