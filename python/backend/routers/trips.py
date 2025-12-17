@@ -2,7 +2,8 @@
 # 일정 항목(Itinerary Item) 추가/삭제/순서 변경 및 실행 취소(Undo) 기능
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Dict, Optional
 import uuid
 import json 
@@ -51,6 +52,29 @@ def log_action(db: Session, trip_id: int, user_id: int, action_type: str, item_i
     )
     db.add(new_action)
 
+def _get_or_create_place(db: Session, item_data: schemas.ItemCreate) -> models.Place:
+    """
+    주어진 item_data를 기반으로 장소를 찾거나 새로 생성하는 헬퍼 함수
+    """
+    place = None
+    if item_data.place_id:
+        place = db.query(models.Place).filter(models.Place.place_id == item_data.place_id).first()
+    elif item_data.place_name:
+        place = db.query(models.Place).filter(models.Place.place_name == item_data.place_name).first()
+        if not place and item_data.lat is not None and item_data.lng is not None:
+            place = models.Place(
+                place_name=item_data.place_name,
+                address=item_data.place_name,
+                latitude=item_data.lat,
+                longitude=item_data.lng,
+            )
+            db.add(place)
+            db.flush()
+            db.refresh(place)
+
+    if not place:
+        raise HTTPException(status_code=404, detail=f"장소를 찾거나 생성할 수 없습니다: {item_data.place_name}")
+    return place
 
 # =============================================================================
 # 1. 여행(Trip) 기본 관리 API
@@ -79,6 +103,43 @@ def create_trip(
     db.commit()
 
     return new_trip
+
+@router.put("/{trip_id}", status_code=status.HTTP_204_NO_CONTENT)
+def update_trip_itinerary(
+    trip_id: int,
+    trip_update: schemas.TripUpdate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    기존 여행 계획의 전체 일정을 새로운 일정으로 교체합니다.
+    """
+    check_collaborator_permission(trip_id, current_user.user_id, db)
+
+    try:
+        # 1. 기존 일정 모두 삭제
+        db.query(models.ItineraryItem).filter(models.ItineraryItem.trip_id == trip_id).delete(synchronize_session=False)
+
+        # 2. 새로운 일정 추가
+        for item_data in trip_update.itineraries:
+            place = _get_or_create_place(db, item_data)
+            
+            new_item = models.ItineraryItem(
+                trip_id=trip_id,
+                place_id=place.place_id,
+                user_id=current_user.user_id,
+                visit_day_str=item_data.visit_day_str,
+                order_in_day=item_data.order_in_day
+            )
+            db.add(new_item)
+        
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"--- !!! 여행 업데이트 중 오류 발생 !!! ---: {e}")
+        raise HTTPException(status_code=500, detail="여행 계획 업데이트 중 오류가 발생했습니다.")
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get("/my-trips", response_model=List[schemas.Trip])
 def get_my_trips(
@@ -138,16 +199,14 @@ def join_trip(
     
     return {"message": f"'{trip.trip_name}' 여행에 성공적으로 참여했습니다."}
 
-# ★ [수정됨] shareable_link_id(문자열) 대신 trip_id(숫자)로 조회하도록 변경
 @router.get("/{trip_id}/details", response_model=schemas.TripDetailsResponse)
 def get_trip_details(
     trip_id: int, 
     db: Session = Depends(database.get_db)
 ):
     """
-    특정 여행 계획의 상세 정보(참여자, 날짜별 일정 등)를 모두 조회합니다.
+    특정 여행 계획의 상세 정보(참여자, 날짜별 일정, 추천)를 모두 조회합니다.
     """
-    # 1. trip_id로 조회 변경
     trip = db.query(models.Trip).filter(models.Trip.trip_id == trip_id).first()
     
     if not trip:
@@ -160,9 +219,9 @@ def get_trip_details(
     # 2. 모든 일정 항목 조회
     items_query = db.query(
         models.ItineraryItem.item_id,
-        models.ItineraryItem.user_id,
         models.Place.place_name,
         models.Place.place_id,
+        models.Place.category,
         models.ItineraryItem.visit_day_str,
         models.ItineraryItem.order_in_day
     ).join(models.Place, models.ItineraryItem.place_id == models.Place.place_id)\
@@ -170,15 +229,15 @@ def get_trip_details(
      .order_by(models.ItineraryItem.visit_day_str, models.ItineraryItem.order_in_day)\
      .all()
 
-    # 3. 사용자별 + 날짜별로 일정 그룹화
-    itineraries_by_user_day = {str(p.user_id): {} for p in participants} 
+    # 3. 날짜별로 일정 그룹화 및 현재 여행의 장소/카테고리 수집
+    itineraries_by_day: Dict[str, List[schemas.ItineraryItemSimple]] = {}
+    place_ids_in_trip = set()
+    categories_in_trip = set()
+
     for item in items_query:
-        user_id_str = str(item.user_id)
-        day_str = item.visit_day_str
-        
-        if user_id_str not in itineraries_by_user_day: continue
-        if day_str not in itineraries_by_user_day[user_id_str]:
-            itineraries_by_user_day[user_id_str][day_str] = []
+        day_str = "Day 1" # Hardcoding to match frontend expectations
+        if day_str not in itineraries_by_day:
+            itineraries_by_day[day_str] = []
 
         itinerary_item_schema = schemas.ItineraryItemSimple(
             item_id=item.item_id,
@@ -186,13 +245,46 @@ def get_trip_details(
             place_name=item.place_name,
             order_in_day=item.order_in_day
         )
-        itineraries_by_user_day[user_id_str][day_str].append(itinerary_item_schema)
-            
+        itineraries_by_day[day_str].append(itinerary_item_schema)
+        place_ids_in_trip.add(item.place_id)
+        if item.category:
+            categories_in_trip.add(item.category)
+
+    # 4. 추천 여행지 (alternatives) 생성
+    alternatives = []
+    if categories_in_trip:
+        like_conditions = " OR ".join(
+            [f"PLACES.category LIKE :kw{i}" for i, kw in enumerate(categories_in_trip)]
+        )
+        params = {f"kw{i}": f"%{kw}%" for i, kw in enumerate(categories_in_trip)}
+        
+        # 현재 여행에 포함된 장소들은 제외
+        if place_ids_in_trip:
+            exclude_condition = f"AND PLACES.place_id NOT IN ({','.join(map(str, place_ids_in_trip))})"
+        else:
+            exclude_condition = ""
+
+        query_sql = f"""
+            SELECT PLACES.place_name FROM PLACES
+            LEFT JOIN ITINERARY_ITEMS ON PLACES.place_id = ITINERARY_ITEMS.place_id
+            WHERE ({like_conditions}) {exclude_condition}
+            GROUP BY PLACES.place_name
+            ORDER BY COUNT(ITINERARY_ITEMS.item_id) DESC
+            LIMIT 20;
+        """
+        
+        try:
+            results = db.execute(text(query_sql), params).fetchall()
+            alternatives = [row[0] for row in results]
+        except Exception as e:
+            print(f"--- !!! 추천 여행지 생성 중 오류 발생 !!! ---: {e}")
+
     return {
         "trip_name": trip.trip_name,
         "participants": participants,
-        "itineraries": itineraries_by_user_day,
-        "shareable_link_id": trip.shareable_link_id  # 공유 링크 ID도 반환
+        "itineraries": itineraries_by_day,
+        "shareable_link_id": trip.shareable_link_id,
+        "alternatives": alternatives
     }
 
 
@@ -212,14 +304,12 @@ def add_itinerary_item(
     """
     check_collaborator_permission(trip_id, current_user.user_id, db)
     
-    place = db.query(models.Place).filter(models.Place.place_id == item_data.place_id).first()
-    if not place:
-        raise HTTPException(status_code=404, detail=f"Place ID {item_data.place_id}를 찾을 수 없습니다.")
+    place = _get_or_create_place(db, item_data)
 
     try:
         new_item = models.ItineraryItem(
             trip_id=trip_id,
-            place_id=item_data.place_id,
+            place_id=place.place_id,
             user_id=current_user.user_id,
             visit_day_str=item_data.visit_day_str,
             order_in_day=item_data.order_in_day

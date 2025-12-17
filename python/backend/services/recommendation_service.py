@@ -74,7 +74,7 @@ TAG_TO_CATEGORY_MAP = {
 }
 
 # --- 2. Gemini API 설정 ---
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # .env 파일에서 키를 읽어옴
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
 else:
@@ -202,10 +202,12 @@ def get_ai_recommendations(
         ]
 
     try:
-        # 라이브러리가 최신 버전이면 이 코드가 정상 작동합니다.
-        model = genai.GenerativeModel('gemini-flash-latest')
+        model = genai.GenerativeModel('models/gemini-flash-latest')
         response = model.generate_content(
-            prompt, generation_config={"response_mime_type": "application/json"}
+            prompt,
+            generation_config={
+                "response_mime_type": "application/json"
+            }
         )
         print(f"[AI 서비스] AI 응답 수신 완료.")
 

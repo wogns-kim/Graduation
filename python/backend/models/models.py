@@ -39,10 +39,6 @@ class Place(Base):
     latitude = Column(DECIMAL(10, 7), nullable=True)
     longitude = Column(DECIMAL(10, 7), nullable=True)
     category = Column(String(255), nullable=True)
-    # 카테고리 테이블의 ID를 참조하는 외래 키
-    category_id = Column(Integer, ForeignKey("CATEGORIES.category_id"))
-    # Category 모델과 연결
-    category_rel = relationship("Category", back_populates="places")
 
 class ItineraryItem(Base):
     __tablename__ = "ITINERARY_ITEMS"
@@ -70,5 +66,3 @@ class Category(Base):
     __tablename__ = "CATEGORIES"
     category_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False)
-    # Place와의 관계 설정 (역참조)
-    places = relationship("Place", back_populates="category_rel")

@@ -63,7 +63,10 @@ class ItineraryItemSimple(BaseModel):
         from_attributes = True
 
 class ItemCreate(BaseModel):
-    place_id: int
+    place_id: Optional[int] = None
+    place_name: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
     visit_day_str: str 
     order_in_day: int
 
@@ -72,10 +75,16 @@ class ItemReorder(BaseModel):
     ordered_item_ids: List[int]
 
 # --- Trip Details ---
+class TripUpdate(BaseModel):
+    itineraries: List[ItemCreate]
+
+
 class TripDetailsResponse(BaseModel):
     trip_name: str
     participants: List[UserSimple]
-    itineraries: Dict[str, Dict[str, List[ItineraryItemSimple]]]
+    itineraries: Dict[str, List[ItineraryItemSimple]]
+    shareable_link_id: str
+    alternatives: List[str]
 
 # --- Recommendation ---
 class RecommendationResponse(BaseModel):
