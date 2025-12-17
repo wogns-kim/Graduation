@@ -31,7 +31,7 @@ FRONTEND_PREFERENCES_URL = "/taste"
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': '', # 본인의 DB 비밀번호로 수정
+    'password': '!j76684133', # 본인의 DB 비밀번호로 수정
     'database': 'first_trip'
 }
 
