@@ -52,14 +52,15 @@ function KakaoCallback() {
                     token: result.access_token, // 백엔드에서 준 JWT 토큰
                     nextAction: result.next_action
                 }, window.location.origin);
-                
+
                 window.close(); // 창 닫기
 
-            } catch (error) {
+            } catch (error: any) {
                 console.error("로그인 처리 실패:", error);
-                // 4. 실패: 실패 메시지를 부모창에 전송
-                window.opener?.postMessage({ 
-                    type: "KAKAO_LOGIN_FAIL" 
+                // 4. 실패: 실패 메시지와 상세 에러 내용을 부모창에 전송
+                window.opener?.postMessage({
+                    type: "KAKAO_LOGIN_FAIL",
+                    error: error.message || "알 수 없는 에러" // ★ 에러 내용을 여기에 담습니다.
                 }, window.location.origin);
                 window.close(); // 창 닫기
             }
