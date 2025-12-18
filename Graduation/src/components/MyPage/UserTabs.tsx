@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled from "@emotion/styled";
 import { Link } from 'react-router-dom';
+import { Trash2 } from "lucide-react";
 
 // --- 스타일 ---
 const TabsContainer = styled.div`
@@ -54,6 +55,31 @@ const TripCard = styled(Link)`
   }
 `;
 
+const DeleteButton = styled.button`
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #eee;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #a0aec0;
+  transition: all 0.2s;
+  z-index: 10;
+
+  &:hover {
+    background: #fff5f5;
+    color: #e53e3e;
+    border-color: #feb2b2;
+    transform: scale(1.1);
+  }
+`;
+
 const CardImage = styled.div<{ bgUrl: string }>`
   height: 180px;
   background-image: url(${(props) => props.bgUrl});
@@ -100,9 +126,10 @@ interface TravelLog {
 interface UserTabsProps {
   travelLogs: TravelLog[];
   preferences: string[]; // 취향 목록 (문자열 배열)
+  onDeleteTrip: (id: number) => void; // [추가] 삭제 핸들러 타입 정의
 }
 
-const UserTabs: React.FC<UserTabsProps> = ({ travelLogs, preferences }) => {
+const UserTabs: React.FC<UserTabsProps> = ({ travelLogs, preferences, onDeleteTrip }) => {
   // 탭 상태 관리 (기본값: 'records')
   const [activeTab, setActiveTab] = useState<"records" | "tastes">("records");
 
@@ -123,6 +150,16 @@ const UserTabs: React.FC<UserTabsProps> = ({ travelLogs, preferences }) => {
           {travelLogs.length > 0 ? (
             travelLogs.map((log) => (
               <TripCard key={log.id} to={`/travel-route/${log.id}`}>
+                <DeleteButton 
+                  onClick={(e) => {
+                    e.preventDefault(); // 링크 이동 방지
+                    e.stopPropagation(); // 이벤트 전파 방지
+                    onDeleteTrip(log.id);
+                  }}
+                  title="여행 기록 삭제"
+                >
+                  <Trash2 size={16} />
+                </DeleteButton>
                 <CardImage bgUrl={log.imageUrl} />
                 <CardContent>
                   <CardTitle>{log.title}</CardTitle>

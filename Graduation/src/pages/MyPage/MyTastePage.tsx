@@ -132,6 +132,34 @@ const MyPage = () => {
     fetchData();
   }, [navigate]);
 
+  const handleDeleteTrip = async (tripId: number) => {
+    if (!window.confirm("정말로 이 여행 기록을 삭제하시겠습니까?")) return;
+
+    const token = localStorage.getItem("access_token");
+    const API_BASE = "http://127.0.0.1:8000/api"; // .env 사용 권장
+
+    try {
+      const response = await fetch(`${API_BASE}/trips/${tripId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        // 성공 시 화면 목록에서도 즉시 제거
+        setApiTrips(prev => prev.filter(trip => trip.trip_id !== tripId));
+        alert("여행 기록이 삭제되었습니다.");
+      } else {
+        const errorData = await response.json();
+        alert(`삭제 실패: ${errorData.detail || '알 수 없는 오류'}`);
+      }
+    } catch (error) {
+      console.error("삭제 중 오류:", error);
+      alert("서버 오류가 발생했습니다.");
+    }
+  };
+
   if (isLoading) return <div style={{textAlign: 'center', marginTop: '100px'}}>로딩 중...</div>;
 
   // 4. 데이터 가공 (백엔드 데이터 -> 프론트 컴포넌트용 데이터 변환)
@@ -181,7 +209,8 @@ const MyPage = () => {
           {/* preferences도 함께 전달 */}
           <UserTabs 
             travelLogs={travelLogsData} 
-            preferences={userProfileData.travelPreferences} 
+            preferences={userProfileData.travelPreferences}
+            onDeleteTrip={handleDeleteTrip}
           />
         </ContentWrap>
       </PageContainer>
