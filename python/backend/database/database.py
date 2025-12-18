@@ -10,7 +10,7 @@ load_dotenv()
 # 2. os.getenv를 사용하여 Railway에 등록한 변수값을 가져옵니다.
 # ("변수명", "기본값") 형태입니다. Railway에 값이 없으면 뒤의 기본값을 사용합니다.
 DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "lNQLAqJxbgvYvDTfsJpbnCkTJPXckTIg")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")  # lNQLAqJxbgvYvDTfsJpbnCkTJPXckTIg
 DB_HOST = os.getenv("DB_HOST", "shortline.proxy.rlwy.net")
 DB_PORT = os.getenv("DB_PORT", "20458")
 DB_NAME = os.getenv("DB_NAME", "Railway_DB")
