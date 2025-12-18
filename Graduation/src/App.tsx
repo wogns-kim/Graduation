@@ -49,10 +49,37 @@ function AppContent() {
   const openCodeModal = () => setIsCodeModalOpen(true);
   const closeCodeModal = () => setIsCodeModalOpen(false);
 
-  const handleJoinGroup = (code: string) => {
-    console.log("입력된 초대 코드:", code);
-    navigate(`/travel-route/${code}`);
-    closeCodeModal();
+  const handleJoinGroup = async (code: string) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      alert("로그인이 필요합니다.");
+      closeCodeModal();
+      return;
+    }
+
+    const API_BASE = import.meta.env.VITE_BACKEND_API_URL || "http://127.0.0.1:8000/api";
+
+    try {
+      const response = await fetch(`${API_BASE}/trips/${code}/join`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(data.message || "여행에 성공적으로 참여했습니다!");
+        navigate(`/travel-route/${data.trip_id}`);
+      } else {
+        throw new Error(data.detail || "참여에 실패했습니다.");
+      }
+    } catch (error: Error) {
+      alert(`오류가 발생했습니다: ${error.message}`);
+    } finally {
+      closeCodeModal();
+    }
   };
 
   // 카카오 로그인 처리 로직

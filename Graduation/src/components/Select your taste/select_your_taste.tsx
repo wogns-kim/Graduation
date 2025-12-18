@@ -38,9 +38,7 @@ interface KeywordButtonProps {
     isSelected: boolean;
 }
 
-interface NavButtonProps {
-    primary?: boolean;
-}
+
 
 // 백엔드의 '취향 저장' API 주소
 const PREFERENCES_API_URL = "http://127.0.0.1:8000/api/users/me/preferences";

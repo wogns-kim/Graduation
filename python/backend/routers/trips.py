@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, func
 from typing import List, Dict, Optional
 import uuid
 import json 
@@ -197,7 +197,11 @@ def join_trip(
     db.add(new_collaborator)
     db.commit()
     
-    return {"message": f"'{trip.trip_name}' 여행에 성공적으로 참여했습니다."}
+    return {
+        "message": f"'{trip.trip_name}' 여행에 성공적으로 참여했습니다.",
+        "trip_id": trip.trip_id,
+        "trip_name": trip.trip_name
+    }
 
 @router.get("/{trip_id}/details", response_model=schemas.TripDetailsResponse)
 def get_trip_details(
@@ -280,6 +284,7 @@ def get_trip_details(
             print(f"--- !!! 추천 여행지 생성 중 오류 발생 !!! ---: {e}")
 
     return {
+        "trip_id": trip.trip_id,
         "trip_name": trip.trip_name,
         "participants": participants,
         "itineraries": itineraries_by_day,
@@ -307,12 +312,20 @@ def add_itinerary_item(
     place = _get_or_create_place(db, item_data)
 
     try:
+        # 해당 날짜의 마지막 순서 + 1을 새로운 order_in_day로 설정
+        max_order = db.query(func.max(models.ItineraryItem.order_in_day)).filter(
+            models.ItineraryItem.trip_id == trip_id,
+            models.ItineraryItem.visit_day_str == item_data.visit_day_str
+        ).scalar() or 0
+        
+        new_order = max_order + 1
+
         new_item = models.ItineraryItem(
             trip_id=trip_id,
             place_id=place.place_id,
             user_id=current_user.user_id,
             visit_day_str=item_data.visit_day_str,
-            order_in_day=item_data.order_in_day
+            order_in_day=new_order
         )
         db.add(new_item)
         db.flush() 

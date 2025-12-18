@@ -80,6 +80,7 @@ class TripUpdate(BaseModel):
 
 
 class TripDetailsResponse(BaseModel):
+    trip_id: int
     trip_name: str
     participants: List[UserSimple]
     itineraries: Dict[str, List[ItineraryItemSimple]]

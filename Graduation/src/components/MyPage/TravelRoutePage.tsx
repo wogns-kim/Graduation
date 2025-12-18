@@ -13,7 +13,7 @@ declare global {
 
 export { };
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { CSSProperties } from 'react'; 
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, Info, Trash2, Map as MapIcon, Users, Plus, Minus, FileText, Search, Save, Share2 } from "lucide-react";
@@ -222,8 +222,13 @@ export default function TravelRoutePage() {
                 });
 
                 if (!updateRes.ok) {
-                    const errorBody = await updateRes.json().catch(() => ({ detail: "Unknown error" }));
-                    throw new Error(`여행 업데이트 실패: ${errorBody.detail}`);
+                    const errorBody = await updateRes.json().catch(() => ({ detail: "알 수 없는 오류" }));
+                    let errorMessage = errorBody.detail;
+                    if (Array.isArray(errorMessage)) {
+                        const firstError = errorMessage[0];
+                        errorMessage = `${firstError.msg} (입력: ${firstError.loc.join(" -> ")})`;
+                    }
+                    throw new Error(`여행 업데이트 실패: ${errorMessage}`);
                 }
                 alert("여행이 성공적으로 업데이트되었습니다!");
             }
@@ -255,6 +260,9 @@ export default function TravelRoutePage() {
                 // 저장된 여행이면 서버로 전송
                 const token = localStorage.getItem("access_token");
                 try {
+                    // Note: We get the latest count inside the callback to avoid stale state
+                    const currentItemCount = (tripData?.itineraries["Day 1"] || []).length;
+
                     const response = await fetch(`${API_BASE}/trips/${cityId}/items`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -263,14 +271,15 @@ export default function TravelRoutePage() {
                             lat,
                             lng,
                             visit_day_str: "2025-01-01", // 임시 날짜
-                            order_in_day: currentList.length + 1,
+                            order_in_day: currentItemCount + 1,
                         }),
                     });
 
                     if (response.ok) {
-                        const newItem = await response.json(); // 서버로부터 완전한 item 정보 수신
+                        const newItem = await response.json();
                         setTripData(prev => {
                             if (!prev) return null;
+                            const currentList = prev.itineraries["Day 1"] || [];
                             const updatedList = [...currentList, { ...newItem, address: addressName, lat, lng }];
                             return { ...prev, itineraries: { ...prev.itineraries, "Day 1": updatedList } };
                         });
@@ -562,7 +571,7 @@ export default function TravelRoutePage() {
                             <div style={styles.emptyState}>장소가 없습니다.<br />지도를 클릭해보세요!</div>
                         ) : (
                             day1Items.map((point, idx) => (
-                                <div key={idx} style={styles.detailItem}>
+                                <div key={point.item_id || idx} style={styles.detailItem}>
                                     <div style={styles.detailIndex}>{idx + 1}</div>
                                     <div style={{ ...styles.detailAddress, flex: 1 }}>{point.place_name}</div>
                                     <button className="point-delete-btn" onClick={(e) => { e.stopPropagation(); deletePoint("Day 1", point.item_id); }} title="삭제">

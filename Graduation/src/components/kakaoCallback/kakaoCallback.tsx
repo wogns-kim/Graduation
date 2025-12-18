@@ -55,7 +55,7 @@ function KakaoCallback() {
 
                 window.close(); // 창 닫기
 
-            } catch (error: any) {
+            } catch (error: Error) {
                 console.error("로그인 처리 실패:", error);
                 // 4. 실패: 실패 메시지와 상세 에러 내용을 부모창에 전송
                 window.opener?.postMessage({
