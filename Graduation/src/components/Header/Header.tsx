@@ -4,8 +4,6 @@ import { Link } from "react-router-dom";
 
 // --- 카카오 로그인 설정 ---
 const KAKAO_REST_API_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY;
-const REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI;
-const KAKAO_AUTH_URL = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`;
 
 // --- HeaderProps 정의 ---
 interface HeaderProps {
@@ -122,7 +120,9 @@ const ActionButton = styled.button<{ primary?: boolean }>`
 function Header({ isLoggedIn, onLogoutClick, onCodeClick }: HeaderProps) {
 
   const handleKakaoLogin = () => {
-    window.open(KAKAO_AUTH_URL, "kakaoLogin", "width=500,height=600");
+    const redirectUri = `${window.location.origin}/kakaoCallback`;
+    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_REST_API_KEY}&redirect_uri=${redirectUri}&response_type=code`;
+    window.open(kakaoAuthUrl, "kakaoLogin", "width=500,height=600");
   };
 
   return (
