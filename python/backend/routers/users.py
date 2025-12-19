@@ -16,7 +16,7 @@ from schemas import schemas
 from typing import List, Optional
 
 # --- 설정 ---
-KAKAO_REST_API_KEY = "8f796f4dc0ce5b285971669365326acc"
+KAKAO_REST_API_KEY = "8abfe377ab126ace7e541f101103470d"
 KAKAO_REDIRECT_URI = "http://localhost:5173/auth/kakao/callback" # 프론트엔드 팝업 경로
 JWT_SECRET_KEY = "super-secret-key"
 JWT_ALGORITHM = "HS256"

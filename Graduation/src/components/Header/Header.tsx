@@ -120,7 +120,7 @@ const ActionButton = styled.button<{ primary?: boolean }>`
 function Header({ isLoggedIn, onLogoutClick, onCodeClick }: HeaderProps) {
 
   const handleKakaoLogin = () => {
-    const redirectUri = `${window.location.origin}/kakaoCallback`;
+    const redirectUri = `${window.location.origin}/auth/kakao/callback`;
     const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_REST_API_KEY}&redirect_uri=${redirectUri}&response_type=code`;
     window.open(kakaoAuthUrl, "kakaoLogin", "width=500,height=600");
   };

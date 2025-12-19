@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
-const BACKEND_PROCESS_URL = "http://127.0.0.1:8000/api/users/kakao/process-login";
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL;
+const BACKEND_PROCESS_URL = `${BACKEND_API_URL}/users/kakao/process-login`;
 
 function KakaoCallback() {
     const [searchParams] = useSearchParams();

@@ -57,7 +57,7 @@ function AppContent() {
       return;
     }
 
-    const API_BASE = import.meta.env.VITE_BACKEND_API_URL || "http://127.0.0.1:8000/api";
+    const API_BASE = import.meta.env.VITE_BACKEND_API_URL;
 
     try {
       const response = await fetch(`${API_BASE}/trips/${code}/join`, {
