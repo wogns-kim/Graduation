@@ -135,7 +135,7 @@ function AppContent() {
         </Route>
 
         <Route path="/taste" element={<Taste />} />
-        <Route path="/auth/kakao/callback" element={<KakaoCallback />} />
+        <Route path="/kakaoCallback" element={<KakaoCallback />} />
       </Routes>
 
       <CodeInputModal
