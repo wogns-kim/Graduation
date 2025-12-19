@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from "@emotion/styled";
 import { useNavigate } from 'react-router-dom';
+// [수정 1] config에서 API 주소 가져오기 (이미 import 되어 있네요!)
+import { API_BASE_URL } from '../../config';
 
 import UserProfile from '../../components/MyPage/UserProfile';
 import UserTabs from '../../components/MyPage/UserTabs';
@@ -9,7 +11,7 @@ import UserTabs from '../../components/MyPage/UserTabs';
 interface APIUserProfile {
   username: string;
   profile_image_url: string | null;
-  preferences: string | null; // 예: "#힐링,#맛집"
+  preferences: string | null;
 }
 
 interface APITrip {
@@ -70,16 +72,13 @@ const MyPage = () => {
   const [apiUser, setApiUser] = useState<APIUserProfile | null>(null);
   const [apiTrips, setApiTrips] = useState<APITrip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // const [selectedStyle, setSelectedStyle] = useState('전체'); // 사용하지 않으므로 제거 가능
 
-  // 2. 로그아웃
+  // 2. 수정 버튼 (취향 선택 페이지 이동)
   const handleEdit = () => {
-    // 취향 선택 페이지로 이동
     navigate('/taste');
   };
 
-  // 3. 백엔드 데이터 가져오기
+  // 3. 백엔드 데이터 가져오기 (병렬 처리 적용)
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem("access_token");
@@ -94,30 +93,26 @@ const MyPage = () => {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json"
         };
-        // .env 환경변수 사용 권장 (import.meta.env.VITE_BACKEND_API_URL)
-        const API_BASE = "http://127.0.0.1:8000/api";
 
-        // (1) 내 프로필 조회
-        const userRes = await fetch(`${API_BASE}/users/me`, { headers });
+        // [수정 2] Promise.all을 사용하여 프로필과 여행 목록을 '동시에' 요청 (속도 향상)
+        // [수정 3] 하드코딩된 주소 대신 API_BASE_URL 사용
+        const [userRes, tripsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/users/me`, { headers }),
+          fetch(`${API_BASE_URL}/api/trips/my-trips`, { headers })
+        ]);
+
+        // (1) 프로필 응답 처리
         if (userRes.ok) {
             const userData = await userRes.json();
             setApiUser(userData);
-            
-            /* UserProfile에서 필터링 기능을 사용하지 않으므로 이 부분도 제거 가능
-            if (userData.preferences) {
-                const firstPref = userData.preferences.split(',')[0];
-                setSelectedStyle(firstPref.replace('#', ''));
-            }
-            */
         } else if (userRes.status === 401) {
             localStorage.removeItem("access_token");
             alert("세션이 만료되었습니다.");
             navigate("/");
-            return;
+            return; // 여기서 종료
         }
 
-        // (2) 내 여행 목록 조회
-        const tripsRes = await fetch(`${API_BASE}/trips/my-trips`, { headers });
+        // (2) 여행 목록 응답 처리
         if (tripsRes.ok) {
             setApiTrips(await tripsRes.json());
         }
@@ -136,10 +131,10 @@ const MyPage = () => {
     if (!window.confirm("정말로 이 여행 기록을 삭제하시겠습니까?")) return;
 
     const token = localStorage.getItem("access_token");
-    const API_BASE = "http://127.0.0.1:8000/api"; // .env 사용 권장
-
+    
+    // [수정 4] 삭제 요청에서도 하드코딩 제거하고 config 변수 사용
     try {
-      const response = await fetch(`${API_BASE}/trips/${tripId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/trips/${tripId}`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -147,7 +142,6 @@ const MyPage = () => {
       });
 
       if (response.ok) {
-        // 성공 시 화면 목록에서도 즉시 제거
         setApiTrips(prev => prev.filter(trip => trip.trip_id !== tripId));
         alert("여행 기록이 삭제되었습니다.");
       } else {
@@ -162,25 +156,21 @@ const MyPage = () => {
 
   if (isLoading) return <div style={{textAlign: 'center', marginTop: '100px'}}>로딩 중...</div>;
 
-  // 4. 데이터 가공 (백엔드 데이터 -> 프론트 컴포넌트용 데이터 변환)
-  
-  // UserProfile용 데이터 가공
+  // 4. 데이터 가공
   const userProfileData = apiUser ? {
       name: apiUser.username,
       ageGroup: '20대', 
       introduction: '아직 자기소개가 없습니다.', 
-      // --- [수정] travelPreferences (배열)로 변환하여 전달 ---
       travelPreferences: apiUser.preferences ? apiUser.preferences.split(',') : [],
       profileImage: apiUser.profile_image_url || '/MyPage_images/Profile.png', 
   } : {
       name: '', 
       ageGroup: '', 
       introduction: '', 
-      travelPreferences: [], // 빈 배열
+      travelPreferences: [],
       profileImage: ''
   };
 
-  // UserTabs용 데이터 (여행 목록)
   const travelLogsData = apiTrips.map(trip => ({
       id: trip.trip_id,
       title: trip.trip_name,
@@ -190,7 +180,6 @@ const MyPage = () => {
 
   return (
     <>
-      {/* <Header /> */}
       <PageContainer>
         <ContentWrap>
           <PageHeader>
@@ -198,15 +187,11 @@ const MyPage = () => {
             <LogoutButton onClick={handleEdit}>수정</LogoutButton>
           </PageHeader>
 
-          {/* 프로필 정보 컴포넌트 */}
-          {/* --- [수정] 불필요한 props (selectedValue, onChange) 제거 --- */}
           <UserProfile
             user={userProfileData}
-            tripCount={travelLogsData.length} // UserProfile에 필요한 tripCount 전달
+            tripCount={travelLogsData.length} 
           />
 
-          {/* 탭 메뉴 및 컨텐츠 컴포넌트 */}
-          {/* preferences도 함께 전달 */}
           <UserTabs 
             travelLogs={travelLogsData} 
             preferences={userProfileData.travelPreferences}

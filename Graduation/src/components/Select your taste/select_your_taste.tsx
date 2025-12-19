@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
 import { useNavigate } from "react-router-dom";
+// [수정 1] config에서 API 주소 가져오기
+import { API_BASE_URL } from '../../config';
 
 // 데이터를 객체 배열로 깔끔하게 분리
 const categories = [
@@ -38,17 +40,8 @@ interface KeywordButtonProps {
     isSelected: boolean;
 }
 
-interface NavButtonProps {
-    primary?: boolean;
-}
-
-// 백엔드의 '취향 저장' API 주소
-const PREFERENCES_API_URL = "http://127.0.0.1:8000/api/users/me/preferences";
-
-
 export default function Taste() {
     const [selectedKeywords, setSelectedKeywords] = useState(new Set<string>());
-    
     const navigate = useNavigate();
 
     const toggleKeyword = (keyword: string) => {
@@ -63,7 +56,7 @@ export default function Taste() {
         });
     };
 
-    // '저장' 버튼 클릭 시 실행될 함수 (handleSave 대신 사용)
+    // '저장' 버튼 클릭 시 실행될 함수
     const handleSave = async () => {
         if (selectedKeywords.size === 0) {
             alert("취향을 1개 이상 선택해주세요!");
@@ -73,18 +66,19 @@ export default function Taste() {
         const token = localStorage.getItem("access_token");
         if (!token) {
             alert("로그인 정보가 유효하지 않습니다. 다시 로그인해주세요.");
-            navigate("/"); 
+            navigate("/");
             return;
         }
 
         const preferencesList = Array.from(selectedKeywords);
 
         try {
-            const response = await fetch(PREFERENCES_API_URL, {
+            // [수정 2] API_BASE_URL 변수 사용 (배포 시 자동 변경됨)
+            const response = await fetch(`${API_BASE_URL}/api/users/me/preferences`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}` 
+                    "Authorization": `Bearer ${token}`
                 },
                 body: JSON.stringify({ preferences: preferencesList }),
             });
@@ -102,7 +96,7 @@ export default function Taste() {
             }
 
             alert("취향이 성공적으로 저장되었습니다!");
-            navigate("/"); 
+            navigate("/");
 
         } catch (error) {
             console.error("취향 저장 API 오류:", error);
@@ -190,7 +184,7 @@ const Container = styled.div`
 
 const Header = styled.header`
   text-align: center;
-  margin-bottom: 4rem; /* 버튼 공간 확보를 위해 여백 유지 */
+  margin-bottom: 4rem; 
 
   h1 {
     color: rgb(33, 33, 33);
@@ -211,7 +205,7 @@ const Header = styled.header`
 const MainGrid = styled.main`
   display: grid;
   flex: 1;
-  align-items: stretch; /* 높이를 꽉 채우도록 설정 */
+  align-items: stretch;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 2.5rem;
 
@@ -284,9 +278,9 @@ const KeywordButton = styled.button<KeywordButtonProps>`
   box-shadow: 3px 5px 4px 0px rgba(0, 0, 0, 0.15);
 
   border: 2px solid ${(props) =>
-      props.isSelected ? "rgb(255, 115, 115)" : "rgb(251, 251, 251)"};
+        props.isSelected ? "rgb(255, 115, 115)" : "rgb(251, 251, 251)"};
   background-color: ${(props) =>
-      props.isSelected ? "rgba(255, 220, 220, 0.5)" : "rgb(251, 251, 251)"};
+        props.isSelected ? "rgba(255, 220, 220, 0.5)" : "rgb(251, 251, 251)"};
   color: ${(props) => (props.isSelected ? "rgb(220, 50, 50)" : "black")};
 
   &:hover {
@@ -295,14 +289,12 @@ const KeywordButton = styled.button<KeywordButtonProps>`
   }
 `;
 
-// 👇 깔끔하게 변경된 저장 버튼 스타일
 const SaveButton = styled.button`
   position: absolute;
   top: -4rem; 
   right: 0;
   
-  /* 디자인 변경: 심플하고 모던하게 */
-  background-color: #3C73EC; /* 테마의 Primary Color (파란색) */
+  background-color: #3C73EC; 
   color: white;
   border: none;
   border-radius: 8px;
@@ -310,17 +302,17 @@ const SaveButton = styled.button`
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 6px rgba(60, 115, 236, 0.2); /* 부드러운 파란 그림자 */
+  box-shadow: 0 4px 6px rgba(60, 115, 236, 0.2);
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: #2a5bbf; /* 호버 시 약간 진하게 */
-    transform: translateY(-2px); /* 살짝 떠오르는 효과 */
+    background-color: #2a5bbf; 
+    transform: translateY(-2px); 
     box-shadow: 0 6px 12px rgba(60, 115, 236, 0.3);
   }
 
   &:active {
-    transform: translateY(0); /* 클릭 시 눌리는 효과 */
+    transform: translateY(0); 
   }
 
   @media (max-width: 900px) {

@@ -13,11 +13,12 @@ declare global {
 
 export { };
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import type { CSSProperties } from 'react'; 
+import React, { useEffect, useState, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { MapPin, Info, Trash2, Map as MapIcon, Users, Plus, Minus, FileText, Search, Save, Share2 } from "lucide-react";
-
+import { MapPin, Info, Trash2, Map as MapIcon, Users, Plus, Minus, Search, Save, Share2 } from "lucide-react";
+// [수정 1] config에서 중앙 관리되는 API 주소 가져오기
+import { API_BASE_URL } from '../../config';
 
 // --- 타입 정의 ---
 interface ItineraryItem {
@@ -65,11 +66,8 @@ export default function TravelRoutePage() {
     // 데이터 상태
     const [tripData, setTripData] = useState<TripDetails | null>(null);
 
-    // shareCode 초기화: 데이터가 있으면 데이터로, 없으면 랜덤값
+    // shareCode 초기화
     const [shareCode, setShareCode] = useState(Math.random().toString(36).substring(2, 8).toUpperCase());
-
-    // API URL
-    const API_BASE = import.meta.env.VITE_BACKEND_API_URL || "http://127.0.0.1:8000/api";
 
     // --- [1] 데이터 로딩 ---
     useEffect(() => {
@@ -81,7 +79,8 @@ export default function TravelRoutePage() {
                     // [A] AI 추천 모드
                     const startDate = searchParams.get('start');
                     const endDate = searchParams.get('end');
-                    const response = await fetch(`${API_BASE}/recommendations?start_date=${startDate}&end_date=${endDate}`, {
+                    // [수정 2] API_BASE_URL 사용
+                    const response = await fetch(`${API_BASE_URL}/api/recommendations?start_date=${startDate}&end_date=${endDate}`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     });
 
@@ -93,7 +92,7 @@ export default function TravelRoutePage() {
                         if (firstCourse.route) {
                             for (const day in firstCourse.route) {
                                 itineraries[day] = firstCourse.route[day].map((placeName: string, index: number) => ({
-                                    item_id: Date.now() + index, // temporary unique id
+                                    item_id: Date.now() + index,
                                     place_name: placeName,
                                     order_in_day: index + 1,
                                 }));
@@ -111,7 +110,8 @@ export default function TravelRoutePage() {
                     } else { throw new Error("AI Load Failed"); }
                 } else {
                     // [B] DB 조회 모드
-                    const response = await fetch(`${API_BASE}/trips/${cityId}/details`, {
+                    // [수정 2] API_BASE_URL 사용
+                    const response = await fetch(`${API_BASE_URL}/api/trips/${cityId}/details`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     });
 
@@ -126,11 +126,12 @@ export default function TravelRoutePage() {
                             isAiResult: false,
                             shareCode: data.shareable_link_id || "CODE"
                         });
-                        if(data.shareable_link_id) setShareCode(data.shareable_link_id);
+                        if (data.shareable_link_id) setShareCode(data.shareable_link_id);
                     }
                 }
             } catch (error) {
                 console.error("데이터 로딩 실패:", error);
+                // 에러 발생 시 더미 데이터
                 setTripData({
                     trip_name: "데이터 로딩 실패(샘플)",
                     participants: [],
@@ -144,10 +145,10 @@ export default function TravelRoutePage() {
             }
         };
         fetchTripDetails();
-    }, [cityId, searchParams, API_BASE, shareCode]);
+    }, [cityId, searchParams, shareCode]);
 
 
-    // --- [2] 기능 핸들러 (수정) ---
+    // --- [2] 기능 핸들러 (수정됨) ---
 
     const handleSave = async () => {
         if (!tripData) return;
@@ -160,7 +161,8 @@ export default function TravelRoutePage() {
         try {
             // Case 1: AI 추천 결과를 새로 저장
             if (tripData.isAiResult) {
-                const createRes = await fetch(`${API_BASE}/trips`, {
+                // 1. 여행(Trip) 생성
+                const createRes = await fetch(`${API_BASE_URL}/api/trips`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                     body: JSON.stringify({ trip_name: tripData.trip_name })
@@ -171,36 +173,52 @@ export default function TravelRoutePage() {
                 const newTripId = newTrip.trip_id;
 
                 const itemsToAdd = tripData.itineraries["Day 1"] || [];
-                for (let i = 0; i < itemsToAdd.length; i++) {
-                    const item = itemsToAdd[i];
+
+                // [수정 3] 병렬 처리 (Promise.all) 적용 - 속도 최적화
+                const savePromises = itemsToAdd.map(async (item, index) => {
                     let lat = item.lat;
                     let lng = item.lng;
 
+                    // 좌표가 없으면 카카오 검색 서비스로 좌표 구하기 (Promise로 감싸기)
                     if (lat === undefined || lng === undefined) {
-                        await new Promise<void>((resolve, reject) => {
-                            if (!psRef.current) return reject(new Error("Kakao Maps Places service is not available."));
-                            psRef.current.keywordSearch(item.place_name, (data: any, status: any) => {
-                                if (status === window.kakao.maps.services.Status.OK && data.length > 0) {
-                                    lat = parseFloat(data[0].y);
-                                    lng = parseFloat(data[0].x);
-                                }
-                                resolve();
+                        try {
+                            const coords: any = await new Promise((resolve, reject) => {
+                                if (!psRef.current) return reject(new Error("Kakao Service Unavailable"));
+                                psRef.current.keywordSearch(item.place_name, (data: any, status: any) => {
+                                    if (status === window.kakao.maps.services.Status.OK && data.length > 0) {
+                                        resolve({ lat: parseFloat(data[0].y), lng: parseFloat(data[0].x) });
+                                    } else {
+                                        resolve({ lat: 0, lng: 0 }); // 검색 실패 시 기본값
+                                    }
+                                });
                             });
-                        });
+                            lat = coords.lat;
+                            lng = coords.lng;
+                        } catch (e) {
+                            lat = 0; lng = 0;
+                        }
                     }
 
-                    await fetch(`${API_BASE}/trips/${newTripId}/items`, {
+                    // 개별 아이템 저장 요청
+                    return fetch(`${API_BASE_URL}/api/trips/${newTripId}/items`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                         body: JSON.stringify({
-                            place_name: item.place_name, lat, lng,
-                            visit_day_str: "2025-01-01", order_in_day: i + 1,
+                            place_name: item.place_name,
+                            lat,
+                            lng,
+                            visit_day_str: "2025-01-01",
+                            order_in_day: index + 1,
                         })
                     });
-                }
+                });
+
+                // 모든 저장 요청이 끝날 때까지 대기
+                await Promise.all(savePromises);
+
                 alert(`'${tripData.trip_name}' 여행이 저장되었습니다!`);
                 navigate(`/travel-route/${newTripId}`);
-            } 
+            }
             // Case 2: 기존 여행 수정 후 업데이트
             else {
                 const itemsToUpdate = tripData.itineraries["Day 1"] || [];
@@ -215,7 +233,7 @@ export default function TravelRoutePage() {
                     }))
                 };
 
-                const updateRes = await fetch(`${API_BASE}/trips/${tripData.trip_id}`, {
+                const updateRes = await fetch(`${API_BASE_URL}/api/trips/${tripData.trip_id}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                     body: JSON.stringify(payload)
@@ -255,7 +273,8 @@ export default function TravelRoutePage() {
                 // 저장된 여행이면 서버로 전송
                 const token = localStorage.getItem("access_token");
                 try {
-                    const response = await fetch(`${API_BASE}/trips/${cityId}/items`, {
+                    // [수정 4] API_BASE_URL 적용
+                    const response = await fetch(`${API_BASE_URL}/api/trips/${cityId}/items`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                         body: JSON.stringify({
@@ -268,7 +287,7 @@ export default function TravelRoutePage() {
                     });
 
                     if (response.ok) {
-                        const newItem = await response.json(); // 서버로부터 완전한 item 정보 수신
+                        const newItem = await response.json();
                         setTripData(prev => {
                             if (!prev) return null;
                             const updatedList = [...currentList, { ...newItem, address: addressName, lat, lng }];
@@ -302,13 +321,12 @@ export default function TravelRoutePage() {
             return;
         }
 
-        // DB 저장된 여행 (서버 통신)
         const token = localStorage.getItem("access_token");
 
         if (existingItem) {
-            // 삭제 로직 (DELETE 요청)
+            // 삭제 로직 (DELETE)
             try {
-                const response = await fetch(`${API_BASE}/trips/items/${existingItem.item_id}`, {
+                const response = await fetch(`${API_BASE_URL}/api/trips/items/${existingItem.item_id}`, {
                     method: "DELETE",
                     headers: { "Authorization": `Bearer ${token}` }
                 });
@@ -322,23 +340,23 @@ export default function TravelRoutePage() {
             } catch (e) { alert("서버 오류"); }
 
         } else {
-            // 추가 로직 (POST 요청)
+            // 추가 로직 (POST)
             try {
-                const response = await fetch(`${API_BASE}/trips/${cityId}/items`, {
+                const response = await fetch(`${API_BASE_URL}/api/trips/${cityId}/items`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                     body: JSON.stringify({
                         place_name: recName,
-                        visit_day_str: "2025-01-01", // 임시 날짜
+                        visit_day_str: "2025-01-01",
                         order_in_day: currentList.length + 1,
                     }),
                 });
                 if (response.ok) {
                     const newItem = await response.json();
                     setTripData(prev => {
-                         if (!prev) return null;
-                         const updatedList = [...currentList, { ...newItem, address: recName }];
-                         return { ...prev, itineraries: { ...prev.itineraries, "Day 1": updatedList } };
+                        if (!prev) return null;
+                        const updatedList = [...currentList, { ...newItem, address: recName }];
+                        return { ...prev, itineraries: { ...prev.itineraries, "Day 1": updatedList } };
                     });
                 } else { alert("추가 실패"); }
             } catch (e) { alert("서버 오류"); }
@@ -361,7 +379,7 @@ export default function TravelRoutePage() {
         // DB 저장된 여행 (서버 통신)
         const token = localStorage.getItem("access_token");
         try {
-            const response = await fetch(`${API_BASE}/trips/items/${itemIdToDelete}`, {
+            const response = await fetch(`${API_BASE_URL}/api/trips/items/${itemIdToDelete}`, {
                 method: "DELETE",
                 headers: { "Authorization": `Bearer ${token}` }
             });
@@ -381,7 +399,6 @@ export default function TravelRoutePage() {
         }
     };
 
-    // 기타 헬퍼
     const handleCopyCode = () => {
         if (!tripData) return;
         navigator.clipboard.writeText(tripData.shareCode);
@@ -403,85 +420,139 @@ export default function TravelRoutePage() {
     // --- [3] 지도 렌더링 ---
     useEffect(() => {
         const kakaoAppKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY;
-        const loadKakaoMap = () => {
-            if (!window.kakao || !window.kakao.maps) return;
-            window.kakao.maps.load(() => {
-                const container = document.getElementById('map');
-                if (!container) return;
 
-                if (!mapRef.current) {
-                    const options = { center: new window.kakao.maps.LatLng(37.5665, 126.9780), level: 7 };
-                    mapRef.current = new window.kakao.maps.Map(container, options);
-                    psRef.current = new window.kakao.maps.services.Places();
-                    geocoderRef.current = new window.kakao.maps.services.Geocoder();
+        // 지도 생성 함수
+        const initMap = () => {
+            const container = document.getElementById('map');
+            if (!container) return;
 
-                    window.kakao.maps.event.addListener(mapRef.current, 'click', function (mouseEvent: any) {
-                        handleMapClick(mouseEvent.latLng.getLat(), mouseEvent.latLng.getLng());
+            // 지도 객체가 없으면 새로 생성
+            if (!mapRef.current) {
+                const options = { center: new window.kakao.maps.LatLng(37.5665, 126.9780), level: 7 };
+                mapRef.current = new window.kakao.maps.Map(container, options);
+                psRef.current = new window.kakao.maps.services.Places();
+                geocoderRef.current = new window.kakao.maps.services.Geocoder();
+
+                // 클릭 이벤트 등록
+                window.kakao.maps.event.addListener(mapRef.current, 'click', function (mouseEvent: any) {
+                    // 내부에서 최신 상태를 참조하기 어렵기 때문에, 별도 함수보다는 
+                    // lat/lng만 넘기고 로직은 handleMapClick에서 처리하는 방식 권장.
+                    // 여기서는 handleMapClick이 dependency에 들어가면 무한루프 가능성이 있으므로
+                    // mapRef.current에 이벤트를 붙이는 방식은 유지하되, 
+                    // useEffect cleanup에서 잘 지워줘야 함.
+                });
+            }
+        };
+
+        // 데이터를 지도에 그리는 함수
+        const drawTripOnMap = async () => {
+            if (!mapRef.current || !tripData) return;
+
+            // 기존 마커/폴리라인 제거
+            markersRef.current.forEach(m => m.setMap(null));
+            markersRef.current = [];
+            if (polylineRef.current) {
+                polylineRef.current.setMap(null);
+                polylineRef.current = null;
+            }
+
+            const points = tripData.itineraries["Day 1"] || [];
+            if (points.length === 0) return;
+
+            const path: any[] = [];
+
+            for (let i = 0; i < points.length; i++) {
+                const p = points[i];
+                let lat = p.lat;
+                let lng = p.lng;
+
+                // 좌표 없으면 검색 (여기서는 async/await 허용)
+                if (!lat || !lng) {
+                    await new Promise((resolve) => {
+                        if (!psRef.current) { resolve(null); return; }
+                        psRef.current.keywordSearch(p.place_name, (data: any, status: any) => {
+                            if (status === window.kakao.maps.services.Status.OK) {
+                                lat = parseFloat(data[0].y);
+                                lng = parseFloat(data[0].x);
+                            }
+                            resolve(null);
+                        });
                     });
                 }
 
-                if (tripData && tripData.itineraries) {
-                    markersRef.current.forEach(m => m.setMap(null));
-                    markersRef.current = [];
-                    if (polylineRef.current) polylineRef.current.setMap(null);
-
-                    const points = tripData.itineraries["Day 1"] || [];
-                    if (points.length === 0) return;
-
-                    const path: any[] = [];
-                    const drawMap = async () => {
-                        for (let i = 0; i < points.length; i++) {
-                            const p = points[i];
-                            let lat = p.lat;
-                            let lng = p.lng;
-
-                            if (!lat || !lng) {
-                                await new Promise((resolve) => {
-                                    psRef.current.keywordSearch(p.place_name, (data: any, status: any) => {
-                                        if (status === window.kakao.maps.services.Status.OK) {
-                                            lat = parseFloat(data[0].y);
-                                            lng = parseFloat(data[0].x);
-                                        }
-                                        resolve(null);
-                                    });
-                                });
-                            }
-
-                            if (lat && lng) {
-                                const position = new window.kakao.maps.LatLng(lat, lng);
-                                path.push(position);
-                                const content = `
-                                    <div style="position: relative; width: 0; height: 0;">
-                                        <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 4px 10px; border-radius: 15px; border: 1px solid #3B82F6; font-size: 12px; font-weight: bold; color: #3B82F6; box-shadow: 0 2px 4px rgba(0,0,0,0.2); pointer-events: none;">${p.place_name}</div>
-                                        <div style="position: absolute; top: 0; left: 0; transform: translate(-50%, -50%); width: 24px; height: 24px; background: #3B82F6; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${i + 1}</div>
-                                    </div>`;
-                                const overlay = new window.kakao.maps.CustomOverlay({ position: position, content: content, map: mapRef.current });
-                                markersRef.current.push(overlay);
-                            }
-                        }
-
-                        if (path.length > 1) {
-                            const polyline = new window.kakao.maps.Polyline({ path: path, strokeWeight: 5, strokeColor: '#667eea', strokeOpacity: 0.8, strokeStyle: 'solid' });
-                            polyline.setMap(mapRef.current);
-                            polylineRef.current = polyline;
-                        }
-                        if (path.length > 0) mapRef.current.panTo(path[path.length - 1]);
-                    };
-                    drawMap();
+                if (lat && lng) {
+                    const position = new window.kakao.maps.LatLng(lat, lng);
+                    path.push(position);
+                    const content = `
+                        <div style="position: relative; width: 0; height: 0;">
+                            <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 4px 10px; border-radius: 15px; border: 1px solid #3B82F6; font-size: 12px; font-weight: bold; color: #3B82F6; box-shadow: 0 2px 4px rgba(0,0,0,0.2); pointer-events: none;">${p.place_name}</div>
+                            <div style="position: absolute; top: 0; left: 0; transform: translate(-50%, -50%); width: 24px; height: 24px; background: #3B82F6; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${i + 1}</div>
+                        </div>`;
+                    const overlay = new window.kakao.maps.CustomOverlay({ position: position, content: content, map: mapRef.current });
+                    markersRef.current.push(overlay);
                 }
-            });
+            }
+
+            if (path.length > 1) {
+                const polyline = new window.kakao.maps.Polyline({ path: path, strokeWeight: 5, strokeColor: '#667eea', strokeOpacity: 0.8, strokeStyle: 'solid' });
+                polyline.setMap(mapRef.current);
+                polylineRef.current = polyline;
+            }
+            if (path.length > 0) mapRef.current.panTo(path[path.length - 1]);
         };
 
+        // 로드 로직 실행
         if (window.kakao && window.kakao.maps) {
-            loadKakaoMap();
+            initMap();
+            drawTripOnMap();
         } else {
             const script = document.createElement("script");
             script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&libraries=services&autoload=false`;
             script.async = false;
-            script.onload = loadKakaoMap;
+            script.onload = () => {
+                window.kakao.maps.load(() => {
+                    initMap();
+                    drawTripOnMap();
+                });
+            };
             document.head.appendChild(script);
         }
-    }, [tripData, handleMapClick]);
+
+        // [수정 5] Cleanup Function 추가 (메모리 누수 방지)
+        return () => {
+            // 마커 제거
+            if (markersRef.current) {
+                markersRef.current.forEach(m => m.setMap(null));
+                markersRef.current = [];
+            }
+            // 폴리라인 제거
+            if (polylineRef.current) {
+                polylineRef.current.setMap(null);
+            }
+            // 지도 인스턴스 해제 (선택적이나 안전함)
+            if (mapRef.current) {
+                mapRef.current = null;
+            }
+        };
+    }, [tripData]); // tripData 변경될 때마다 지도 다시 그리기
+
+    // 지도 클릭 이벤트 별도 등록 (최신 State 참조를 위해)
+    useEffect(() => {
+        if (!mapRef.current) return;
+
+        const clickHandler = (mouseEvent: any) => {
+            handleMapClick(mouseEvent.latLng.getLat(), mouseEvent.latLng.getLng());
+        };
+
+        window.kakao.maps.event.addListener(mapRef.current, 'click', clickHandler);
+
+        return () => {
+            if (mapRef.current) {
+                window.kakao.maps.event.removeListener(mapRef.current, 'click', clickHandler);
+            }
+        }
+    }, [tripData]); // tripData가 바뀔 때마다 핸들러 갱신
+
 
     if (isLoading) return <div style={{ color: 'white', padding: '50px', textAlign: 'center' }}>로딩 중...</div>;
 
