@@ -9,14 +9,18 @@ import requests
 from jose import jwt
 from datetime import datetime, timedelta
 import traceback
+import os
+from dotenv import load_dotenv
 from database import database
 from models import models
 from auth.auth import get_current_user 
 from schemas import schemas 
 from typing import List, Optional
 
+load_dotenv()
+
 # --- 설정 ---
-KAKAO_REST_API_KEY = "8abfe377ab126ace7e541f101103470d"
+KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY")
 KAKAO_REDIRECT_URI = "http://localhost:5173/auth/kakao/callback" # 프론트엔드 팝업 경로
 JWT_SECRET_KEY = "super-secret-key"
 JWT_ALGORITHM = "HS256"
@@ -138,7 +142,6 @@ async def process_kakao_login(kakao_code: schemas.KakaoCode, db: Session = Depen
     except Exception as e: # DB 오류 또는 기타 모든 오류
         db.rollback() # 오류 발생 시 DB 변경사항 되돌리기
         print(f"--- !!! DB 또는 JWT 처리 오류 발생 !!! ---: {e}")
-        import traceback
         traceback.print_exc() 
         raise HTTPException(status_code=500, detail=f"서버 내부 오류 (DB/JWT): {e}")
     

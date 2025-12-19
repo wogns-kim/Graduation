@@ -57,7 +57,7 @@ function AppContent() {
       return;
     }
 
-    const API_BASE = import.meta.env.VITE_BACKEND_API_URL;
+    const API_BASE = import.meta.env.VITE_BACKEND_API_URL || "http://127.0.0.1:8000/api";
 
     try {
       const response = await fetch(`${API_BASE}/trips/${code}/join`, {
@@ -135,7 +135,7 @@ function AppContent() {
         </Route>
 
         <Route path="/taste" element={<Taste />} />
-        <Route path="/kakaoCallback" element={<KakaoCallback />} />
+        <Route path="/auth/kakao/callback" element={<KakaoCallback />} />
       </Routes>
 
       <CodeInputModal
