@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+
+sqlalchemy
+mysql-connector-python
+
+pydantic
+python-dotenv
+
+requests
+google-generativeai==0.8.6
+
+python-jose[cryptography]
+
+selenium
+webdriver-manager
+beautifulsoup4
